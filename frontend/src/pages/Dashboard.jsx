@@ -80,8 +80,12 @@ const Dashboard = ({ user, triggerReloadUser }) => {
 
   useEffect(() => {
     fetchData();
-    const isTracking = localStorage.getItem('lifetrack_location_tracking') === 'true';
+    const savedPref = localStorage.getItem('lifetrack_location_tracking');
+    const isTracking = savedPref === null ? true : savedPref === 'true';
     setTrackingEnabled(isTracking);
+    if (savedPref === null) {
+      localStorage.setItem('lifetrack_location_tracking', 'true');
+    }
   }, []);
 
   // Geolocation Geofencing Watcher
