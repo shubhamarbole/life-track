@@ -37,8 +37,12 @@ const __dirname = path.dirname(__filename);
 if (process.env.NODE_ENV === 'production') {
   app.use(express.static(path.join(__dirname, '../frontend/dist')));
 
-  // Let React Router handle route routing inside index.html for unknown files
+  // Let React Router handle route routing inside index.html for unknown page routes
   app.get('*', (req, res) => {
+    // If the request is for a file or asset, return 404 instead of serving HTML
+    if (req.path.includes('.') || req.path.startsWith('/assets/')) {
+      return res.status(404).send('Asset not found');
+    }
     res.sendFile(path.resolve(__dirname, '../frontend', 'dist', 'index.html'));
   });
 } else {
