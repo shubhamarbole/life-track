@@ -348,6 +348,50 @@ const Settings = ({ user, onLogout, triggerReloadUser }) => {
         </div>
       </div>
 
+      {/* 2.5 iPhone Apple Health Auto-Sync */}
+      <div className="card">
+        <h3 style={{ fontSize: '1.1rem', fontWeight: 700, marginBottom: '0.5rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+          <Compass size={20} style={{ color: 'var(--primary)' }} />
+          iPhone Apple Health Auto-Sync
+        </h3>
+        <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginBottom: '1rem' }}>
+          Automatically sync your actual iPhone steps to this app using the built-in iOS Shortcuts app.
+        </p>
+        
+        <div style={{ backgroundColor: 'var(--bg-tertiary)', border: '1px solid var(--border)', borderRadius: 'var(--radius-md)', padding: '1rem' }}>
+          <span style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-secondary)' }}>YOUR SECURITY ACCESS TOKEN</span>
+          <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.5rem' }}>
+            <input 
+              type="text" 
+              readOnly 
+              value={token || ''} 
+              style={{
+                flex: 1,
+                fontSize: '0.75rem',
+                fontFamily: 'monospace',
+                backgroundColor: 'var(--bg-secondary)',
+                border: '1px solid var(--border)',
+                borderRadius: 'var(--radius-sm)',
+                padding: '0.5rem',
+                color: 'var(--text-secondary)',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis'
+              }}
+            />
+            <button 
+              onClick={() => {
+                navigator.clipboard.writeText(token);
+                alert("Security Token copied to clipboard! You can paste it into your iOS Shortcuts setup.");
+              }} 
+              className="btn btn-secondary" 
+              style={{ padding: '0.5rem 1rem', fontSize: '0.8rem', whiteSpace: 'nowrap' }}
+            >
+              Copy Token
+            </button>
+          </div>
+        </div>
+      </div>
+
       {/* 3. Privacy & Disclosures */}
       <div className="card" style={{ borderLeft: '4px solid var(--danger)' }}>
         <h3 style={{ fontSize: '1.1rem', fontWeight: 700, marginBottom: '0.5rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
