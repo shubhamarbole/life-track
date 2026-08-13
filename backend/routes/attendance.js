@@ -38,15 +38,27 @@ router.post('/checkin', protect, async (req, res) => {
       date: todayStr,
     });
 
-    if (attendance) {
-      return res.status(400).json({ message: 'Already checked in today', attendance });
-    }
+    if (!attendance) {
+      // First check-in of the day
+      attendance = await OfficeAttendance.create({
+        userId: req.user._id,
+        date: todayStr,
+        arrivalTime: checkinTime,
+        intervals: [{ checkIn: checkinTime }]
+      });
+    } else {
+      // Check if there is already an active (unclosed) interval
+      const activeInterval = attendance.intervals.find(interval => !interval.checkOut);
+      if (activeInterval) {
+        return res.status(400).json({ message: 'Already checked in', attendance });
+      }
 
-    attendance = await OfficeAttendance.create({
-      userId: req.user._id,
-      date: todayStr,
-      arrivalTime: checkinTime,
-    });
+      // Add a new checkin interval
+      attendance.intervals.push({ checkIn: checkinTime });
+      // Reset departureTime since they are currently at the office again
+      attendance.departureTime = null;
+      await attendance.save();
+    }
 
     res.status(201).json(attendance);
   } catch (error) {
@@ -72,15 +84,25 @@ router.post('/checkout', protect, async (req, res) => {
       return res.status(404).json({ message: 'No check-in record found for today' });
     }
 
-    if (attendance.departureTime) {
-      return res.status(400).json({ message: 'Already checked out today', attendance });
+    // Find the active interval (one without a checkOut time)
+    const activeIntervalIndex = attendance.intervals.findIndex(interval => !interval.checkOut);
+    if (activeIntervalIndex === -1) {
+      return res.status(400).json({ message: 'Already checked out', attendance });
     }
 
+    // Close the active interval
+    attendance.intervals[activeIntervalIndex].checkOut = checkoutTime;
     attendance.departureTime = checkoutTime;
 
-    // Calculate duration in ms
-    const duration = checkoutTime.getTime() - new Date(attendance.arrivalTime).getTime();
-    attendance.officeDuration = duration > 0 ? duration : 0;
+    // Recalculate total officeDuration (sum of all completed intervals)
+    let totalDuration = 0;
+    attendance.intervals.forEach(interval => {
+      if (interval.checkIn && interval.checkOut) {
+        const diff = new Date(interval.checkOut).getTime() - new Date(interval.checkIn).getTime();
+        totalDuration += diff > 0 ? diff : 0;
+      }
+    });
+    attendance.officeDuration = totalDuration;
 
     await attendance.save();
     res.json(attendance);

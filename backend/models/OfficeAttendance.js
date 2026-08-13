@@ -1,5 +1,15 @@
 import mongoose from 'mongoose';
 
+const attendanceIntervalSchema = new mongoose.Schema({
+  checkIn: {
+    type: Date,
+    required: true,
+  },
+  checkOut: {
+    type: Date,
+  }
+});
+
 const officeAttendanceSchema = new mongoose.Schema({
   userId: {
     type: mongoose.Schema.Types.ObjectId,
@@ -11,21 +21,21 @@ const officeAttendanceSchema = new mongoose.Schema({
     required: true,
   },
   arrivalTime: {
-    type: Date,
-    required: true,
+    type: Date, // First check-in time of the day
   },
   departureTime: {
-    type: Date,
+    type: Date, // Last check-out time of the day
   },
   officeDuration: {
-    type: Number, // in milliseconds
+    type: Number, // Sum of completed intervals (in milliseconds)
     default: 0,
   },
+  intervals: [attendanceIntervalSchema]
 }, {
   timestamps: true
 });
 
-// A user can check-in once per day (or multiple, but typically once per day for attendance log)
+// A user has one consolidated attendance document per day containing all intervals
 officeAttendanceSchema.index({ userId: 1, date: 1 }, { unique: true });
 
 const OfficeAttendance = mongoose.model('OfficeAttendance', officeAttendanceSchema);
