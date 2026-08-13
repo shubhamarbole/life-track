@@ -1,0 +1,19 @@
+{
+  "short_name": "LifeTrack",
+  "name": "LifeTrack Personal Tracking Platform",
+  "description": "Track your daily office hours, steps, work sessions, and spending in one place.",
+  "icons": [
+    {
+      "src": "/icons/icon.svg",
+      "type": "image/svg+xml",
+      "sizes": "any",
+      "purpose": "any maskable"
+    }
+  ],
+  "start_url": "/",
+  "background_color": "#0f172a",
+  "theme_color": "#4f46e5",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "categories": ["productivity", "finance", "health"]
+}

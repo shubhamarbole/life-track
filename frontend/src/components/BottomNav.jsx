@@ -1,0 +1,47 @@
+import React from 'react';
+import { NavLink } from 'react-router-dom';
+import { Home, Calendar, BarChart2, DollarSign, Settings } from 'lucide-react';
+
+const BottomNav = () => {
+  return (
+    <nav className="bottom-nav">
+      <NavLink 
+        to="/" 
+        className={({ isActive }) => `bottom-nav-item ${isActive ? 'active' : ''}`}
+      >
+        <Home />
+        <span>Home</span>
+      </NavLink>
+      <NavLink 
+        to="/history" 
+        className={({ isActive }) => `bottom-nav-item ${isActive ? 'active' : ''}`}
+      >
+        <Calendar />
+        <span>History</span>
+      </NavLink>
+      <NavLink 
+        to="/analytics" 
+        className={({ isActive }) => `bottom-nav-item ${isActive ? 'active' : ''}`}
+      >
+        <BarChart2 />
+        <span>Analytics</span>
+      </NavLink>
+      <NavLink 
+        to="/money" 
+        className={({ isActive }) => `bottom-nav-item ${isActive ? 'active' : ''}`}
+      >
+        <DollarSign />
+        <span>Money</span>
+      </NavLink>
+      <NavLink 
+        to="/settings" 
+        className={({ isActive }) => `bottom-nav-item ${isActive ? 'active' : ''}`}
+      >
+        <Settings />
+        <span>Settings</span>
+      </NavLink>
+    </nav>
+  );
+};
+
+export default BottomNav;
