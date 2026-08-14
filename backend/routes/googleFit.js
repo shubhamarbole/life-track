@@ -1,6 +1,5 @@
 import express from 'express';
 import jwt from 'jsonwebtoken';
-import fetch from 'node-fetch'; // Standard node fetch library
 import User from '../models/User.js';
 import DailyActivity from '../models/DailyActivity.js';
 import { protect } from '../middleware/auth.js';
