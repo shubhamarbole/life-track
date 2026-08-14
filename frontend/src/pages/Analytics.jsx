@@ -244,7 +244,7 @@ const Analytics = () => {
             <div className="card">
               <h3 style={{ fontSize: '0.95rem', fontWeight: 700, marginBottom: '1.25rem' }}>Daily Working Hours</h3>
               <div style={{ width: '100%', minHeight: '240px' }}>
-                <ResponsiveContainer width="100%" height={240}>
+                <ResponsiveContainer width="100%" height={240} id="work-hours-container">
                   <BarChart data={dailyWorkData} margin={{ left: -20, right: 10 }}>
                     <CartesianGrid strokeDasharray="3 3" vertical={false} />
                     <XAxis dataKey="day" stroke="var(--text-muted)" fontSize={10} tickLine={false} />
@@ -260,7 +260,7 @@ const Analytics = () => {
             <div className="card">
               <h3 style={{ fontSize: '0.95rem', fontWeight: 700, marginBottom: '1.25rem' }}>Daily Walking Distance (km)</h3>
               <div style={{ width: '100%', minHeight: '240px' }}>
-                <ResponsiveContainer width="100%" height={240}>
+                <ResponsiveContainer width="100%" height={240} id="walking-distance-container">
                   <LineChart data={dailyWalkingData} margin={{ left: -20, right: 10 }}>
                     <CartesianGrid strokeDasharray="3 3" vertical={false} />
                     <XAxis dataKey="day" stroke="var(--text-muted)" fontSize={10} tickLine={false} />
@@ -276,7 +276,7 @@ const Analytics = () => {
             <div className="card">
               <h3 style={{ fontSize: '0.95rem', fontWeight: 700, marginBottom: '1.25rem' }}>Daily Spending (₹)</h3>
               <div style={{ width: '100%', minHeight: '240px' }}>
-                <ResponsiveContainer width="100%" height={240}>
+                <ResponsiveContainer width="100%" height={240} id="daily-spending-container">
                   <BarChart data={dailySpendingData} margin={{ left: -20, right: 10 }}>
                     <CartesianGrid strokeDasharray="3 3" vertical={false} />
                     <XAxis dataKey="day" stroke="var(--text-muted)" fontSize={10} tickLine={false} />
@@ -298,7 +298,7 @@ const Analytics = () => {
               ) : (
                 <div style={{ width: '100%', height: '240px', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'space-between' }}>
                   <div style={{ width: '100%', minHeight: '190px', position: 'relative' }}>
-                    <ResponsiveContainer width="100%" height={190}>
+                    <ResponsiveContainer width="100%" height={190} id="spending-pie-container">
                       <PieChart>
                         <Pie
                           data={categoryData}
