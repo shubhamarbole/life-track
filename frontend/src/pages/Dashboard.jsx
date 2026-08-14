@@ -389,24 +389,14 @@ const Dashboard = ({ user, triggerReloadUser }) => {
         .phone-tilt-wrapper {
           position: relative;
           z-index: 1;
-          max-width: 1200px;
-          margin: 0 auto;
+          max-width: 100%;
+          margin: 0;
           background: #08080c;
-          border-radius: 28px;
+          border-radius: 20px;
           border: 1px solid rgba(255, 255, 255, 0.08);
           box-shadow: 0 30px 60px rgba(0, 0, 0, 0.8), inset 0 1px 0 0 rgba(255, 255, 255, 0.05);
           padding: 2rem 1.5rem;
-          transition: transform 0.6s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.6s ease;
-        }
-
-        @media (min-width: 992px) {
-          .phone-tilt-wrapper {
-            transform: perspective(1200px) rotateX(1.5deg) rotateY(-2deg) rotateZ(0.5deg);
-          }
-          .phone-tilt-wrapper:hover {
-            transform: perspective(1200px) rotateX(0deg) rotateY(0deg) rotateZ(0deg);
-            box-shadow: 0 40px 80px rgba(0, 0, 0, 0.9);
-          }
+          width: 100%;
         }
 
         .dashboard-layout-grid {

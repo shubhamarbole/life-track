@@ -1142,9 +1142,9 @@ a {
   padding: 1.5rem;
   padding-top: 7rem; /* Make space for floating header */
   padding-bottom: 5.5rem;
-  max-width: 1200px;
+  max-width: 100%;
   width: 100%;
-  margin: 0 auto;
+  margin: 0;
 }
 
 @media (min-width: 992px) {
