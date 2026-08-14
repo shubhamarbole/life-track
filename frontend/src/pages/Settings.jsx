@@ -17,6 +17,10 @@ const Settings = ({ user, onLogout, triggerReloadUser }) => {
   const [simLoading, setSimLoading] = useState(false);
   const [simSuccess, setSimSuccess] = useState('');
 
+  // Exporter controls
+  const [exportLoading, setExportLoading] = useState(false);
+  const [exportError, setExportError] = useState('');
+
   const token = localStorage.getItem('lifetrack_token');
   const todayStr = new Date().toISOString().split('T')[0];
 
@@ -171,6 +175,152 @@ const Settings = ({ user, onLogout, triggerReloadUser }) => {
     };
 
     reader.readAsText(file);
+  };
+
+  // Export all user data as CSV / Excel sheet
+  const handleExportData = async () => {
+    setExportLoading(true);
+    setExportError('');
+    try {
+      const headers = { 'Authorization': `Bearer ${token}` };
+      const [activitiesRes, attendanceRes, workRes, expensesRes] = await Promise.all([
+        fetch('/api/activity/history', { headers }),
+        fetch('/api/attendance/history', { headers }),
+        fetch('/api/work/history', { headers }),
+        fetch('/api/expense/history', { headers })
+      ]);
+
+      if (!activitiesRes.ok || !attendanceRes.ok || !workRes.ok || !expensesRes.ok) {
+        throw new Error('Failed to retrieve history logs from server.');
+      }
+
+      const [activities, attendance, work, expenses] = await Promise.all([
+        activitiesRes.json(),
+        attendanceRes.json(),
+        workRes.json(),
+        expensesRes.json()
+      ]);
+
+      // Merge all dates into a unified map
+      const daysMap = {};
+      const getDayRecord = (dateStr) => {
+        if (!daysMap[dateStr]) {
+          daysMap[dateStr] = {
+            date: dateStr,
+            steps: 0,
+            distance: 0,
+            duration: 0,
+            arrival: '',
+            departure: '',
+            officeHours: 0,
+            workSessions: [],
+            totalSpent: 0,
+            expensesList: []
+          };
+        }
+        return daysMap[dateStr];
+      };
+
+      // 1. Populate activity steps
+      activities.forEach(item => {
+        if (item.date) {
+          const rec = getDayRecord(item.date);
+          rec.steps = item.steps || 0;
+          rec.distance = item.walkingDistance || 0;
+          rec.duration = item.walkingDuration || 0;
+        }
+      });
+
+      // 2. Populate attendance check-ins
+      attendance.forEach(item => {
+        if (item.date) {
+          const rec = getDayRecord(item.date);
+          rec.arrival = item.arrivalTime ? new Date(item.arrivalTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '';
+          rec.departure = item.departureTime ? new Date(item.departureTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '';
+          rec.officeHours = item.officeDuration ? (item.officeDuration / 3600000).toFixed(2) : 0;
+        }
+      });
+
+      // 3. Populate work sessions
+      work.forEach(item => {
+        if (item.date) {
+          const rec = getDayRecord(item.date);
+          const minutes = item.duration ? Math.round(item.duration / 60000) : 0;
+          rec.workSessions.push(`${item.category} (${minutes}m)`);
+        }
+      });
+
+      // 4. Populate expenses
+      expenses.forEach(item => {
+        if (item.date) {
+          const rec = getDayRecord(item.date);
+          rec.totalSpent += item.amount || 0;
+          rec.expensesList.push(`${item.category}: ₹${item.amount}${item.note ? ' (' + item.note + ')' : ''}`);
+        }
+      });
+
+      // Get sorted list of all unique dates
+      const sortedDates = Object.keys(daysMap).sort((a, b) => new Date(b) - new Date(a));
+
+      if (sortedDates.length === 0) {
+        throw new Error('No tracker data exists to export yet.');
+      }
+
+      // Helper to escape values for CSV columns
+      const escapeCSV = (val) => {
+        if (val === undefined || val === null) return '""';
+        const str = String(val);
+        return `"${str.replace(/"/g, '""')}"`;
+      };
+
+      // Header row
+      const csvHeaders = [
+        'Date',
+        'Steps Count',
+        'Walking Distance (km)',
+        'Walking Duration (mins)',
+        'Office Arrival Time',
+        'Office Departure Time',
+        'Office Hours Logged',
+        'Work Sessions Logged',
+        'Total Money Spent (INR)',
+        'Expense Notes'
+      ];
+
+      // Data rows
+      const csvRows = sortedDates.map(date => {
+        const rec = daysMap[date];
+        return [
+          escapeCSV(rec.date),
+          escapeCSV(rec.steps),
+          escapeCSV(rec.distance.toFixed(2)),
+          escapeCSV(rec.duration),
+          escapeCSV(rec.arrival),
+          escapeCSV(rec.departure),
+          escapeCSV(rec.officeHours),
+          escapeCSV(rec.workSessions.join('; ')),
+          escapeCSV(rec.totalSpent),
+          escapeCSV(rec.expensesList.join('; '))
+        ].join(',');
+      });
+
+      // Combine and trigger blob download
+      const csvString = [csvHeaders.join(','), ...csvRows].join('\n');
+      const blob = new Blob(["\uFEFF" + csvString], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.setAttribute("href", url);
+      link.setAttribute("download", `LifeTrack_Report_${new Date().toISOString().split('T')[0]}.csv`);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error(err);
+      setExportError(err.message || 'An error occurred exporting data.');
+    } finally {
+      setExportLoading(false);
+    }
   };
 
   // Update Settings API
@@ -483,6 +633,42 @@ const Settings = ({ user, onLogout, triggerReloadUser }) => {
             <span>3. Tap the Share icon (top-right) and upload that file here!</span>
           </div>
         </div>
+      </div>
+
+      {/* 2.75 Excel/CSV Exporter */}
+      <div className="card">
+        <h3 style={{ fontSize: '1.1rem', fontWeight: 700, marginBottom: '0.5rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+          <Award size={20} style={{ color: 'var(--success)' }} />
+          Export Data to Excel List
+        </h3>
+        <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginBottom: '1.25rem' }}>
+          Download a complete, Excel-compatible daily spreadsheet report of all your steps, office times, focus work sessions, and expenses!
+        </p>
+
+        {exportError && (
+          <div style={{ padding: '0.75rem', backgroundColor: 'var(--danger-light)', color: 'var(--danger)', borderRadius: 'var(--radius-sm)', marginBottom: '1rem', fontSize: '0.85rem' }}>
+            {exportError}
+          </div>
+        )}
+
+        <button 
+          onClick={handleExportData} 
+          className="btn btn-primary"
+          style={{ width: '100%', display: 'flex', gap: '0.5rem', justifyContent: 'center', alignItems: 'center' }}
+          disabled={exportLoading}
+        >
+          {exportLoading ? (
+            <>
+              <RefreshCw size={18} className="anim-pulse" />
+              <span>Generating Excel List...</span>
+            </>
+          ) : (
+            <>
+              <span>📥</span>
+              <span>Download Excel CSV List</span>
+            </>
+          )}
+        </button>
       </div>
 
       {/* 3. Privacy & Disclosures */}
