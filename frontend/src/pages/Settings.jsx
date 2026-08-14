@@ -75,70 +75,102 @@ const Settings = ({ user, onLogout, triggerReloadUser }) => {
     );
   };
 
-  useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    if (params.get('google') === 'success') {
-      setSettingsSuccess('Google Fit connected successfully!');
-      window.history.replaceState({}, document.title, window.location.pathname);
-      triggerReloadUser();
-      setTimeout(() => setSettingsSuccess(''), 5000);
-    } else if (params.get('google') === 'error') {
-      alert('Failed to connect to Google Fit. Please verify your client credentials and try again.');
-      window.history.replaceState({}, document.title, window.location.pathname);
-    }
-  }, []);
+  const handleCSVUpload = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
 
-  const handleConnectGoogleFit = () => {
-    window.location.href = `/api/auth/google/login?token=${token}`;
-  };
-
-  const handleSyncGoogleFit = async () => {
     setSimLoading(true);
-    setSimSuccess('');
-    try {
-      const response = await fetch('/api/auth/google/google-sync', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify({ date: todayStr })
-      });
-      const data = await response.json();
-      if (!response.ok) {
-        throw new Error(data.message || 'Sync failed');
-      }
-      setSimSuccess(`Google Fit Synced! Today's Steps: ${data.steps.toLocaleString()}`);
-      triggerReloadUser();
-      setTimeout(() => setSimSuccess(''), 5000);
-    } catch (err) {
-      alert(err.message);
-    } finally {
-      setSimLoading(false);
-    }
-  };
+    setSimSuccess('Parsing CSV file...');
 
-  const handleDisconnectGoogleFit = async () => {
-    if (!window.confirm('Are you sure you want to disconnect Google Fit?')) return;
-    setSimLoading(true);
-    try {
-      const response = await fetch('/api/auth/google/disconnect', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`
+    const reader = new FileReader();
+    reader.onload = async (event) => {
+      try {
+        const text = event.target.result;
+        const lines = text.split(/\r?\n/).map(line => line.trim()).filter(line => line.length > 0);
+        if (lines.length < 2) {
+          throw new Error('CSV file is empty or missing data lines.');
         }
-      });
-      if (!response.ok) {
-        throw new Error('Failed to disconnect');
+
+        // Parse headers
+        const headers = lines[0].split(',').map(h => h.trim().toLowerCase());
+        const dateIdx = headers.findIndex(h => h.includes('date') || h.includes('start') || h.includes('time'));
+        const stepsIdx = headers.findIndex(h => h.includes('step'));
+
+        if (dateIdx === -1 || stepsIdx === -1) {
+          throw new Error('Could not find Date and Steps columns in the CSV. Make sure headers contain "Date" and "Steps".');
+        }
+
+        let importCount = 0;
+        let totalStepsImported = 0;
+
+        // Process data rows
+        for (let i = 1; i < lines.length; i++) {
+          const cols = lines[i].split(',').map(c => c.trim());
+          if (cols.length <= Math.max(dateIdx, stepsIdx)) continue;
+
+          const rawDate = cols[dateIdx];
+          const rawSteps = parseInt(cols[stepsIdx]);
+
+          if (isNaN(rawSteps) || !rawDate) continue;
+
+          // Format date to YYYY-MM-DD
+          // Handles "2026-08-13 00:00:00" -> "2026-08-13" or "13/08/2026" -> "2026-08-13"
+          let cleanDate = '';
+          if (rawDate.includes('-')) {
+            cleanDate = rawDate.split(' ')[0]; // Take YYYY-MM-DD
+          } else if (rawDate.includes('/')) {
+            // Check if format is DD/MM/YYYY or YYYY/MM/DD
+            const parts = rawDate.split(' ')[0].split('/');
+            if (parts[0].length === 4) {
+              cleanDate = `${parts[0]}-${parts[1].padStart(2, '0')}-${parts[2].padStart(2, '0')}`;
+            } else {
+              cleanDate = `${parts[2]}-${parts[1].padStart(2, '0')}-${parts[0].padStart(2, '0')}`;
+            }
+          } else {
+            // Fallback: try parsing as Date object
+            const d = new Date(rawDate);
+            if (!isNaN(d.getTime())) {
+              cleanDate = d.toISOString().split('T')[0];
+            }
+          }
+
+          if (!cleanDate || !/^\d{4}-\d{2}-\d{2}$/.test(cleanDate)) continue;
+
+          // Calculate estimated distance and duration
+          const distance = rawSteps * 0.00075;
+          const duration = rawSteps * 0.008;
+
+          // Send POST update to backend
+          await fetch('/api/activity/update', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${token}`
+            },
+            body: JSON.stringify({
+              date: cleanDate,
+              steps: rawSteps,
+              walkingDistance: parseFloat(distance.toFixed(2)),
+              walkingDuration: Math.round(duration)
+            })
+          });
+
+          importCount++;
+          totalStepsImported += rawSteps;
+        }
+
+        setSimSuccess(`Successfully imported steps for ${importCount} days! Total Steps: ${totalStepsImported.toLocaleString()}`);
+        triggerReloadUser();
+        setTimeout(() => setSimSuccess(''), 6000);
+      } catch (err) {
+        alert(err.message);
+      } finally {
+        setSimLoading(false);
+        e.target.value = ''; // Reset file input
       }
-      setSettingsSuccess('Google Fit disconnected successfully!');
-      triggerReloadUser();
-      setTimeout(() => setSettingsSuccess(''), 3000);
-    } catch (err) {
-      alert(err.message);
-    } finally {
-      setSimLoading(false);
-    }
+    };
+
+    reader.readAsText(file);
   };
 
   // Update Settings API
@@ -414,61 +446,41 @@ const Settings = ({ user, onLogout, triggerReloadUser }) => {
         </div>
       </div>
 
-      {/* 2.5 Google Fit Background Sync */}
+      {/* 2.5 Apple Health CSV Importer */}
       <div className="card">
         <h3 style={{ fontSize: '1.1rem', fontWeight: 700, marginBottom: '0.5rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
           <Compass size={20} style={{ color: 'var(--primary)' }} />
-          Google Fit Background Sync
+          iPhone Apple Health CSV Importer
         </h3>
-        <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginBottom: '1rem' }}>
-          Automatically synchronize step counts and walking distance from your iPhone/Android using Google Fit in the background. 
-          <em> (Make sure you enable "Sync with Apple Health" inside the Google Fit app on iOS).</em>
+        <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginBottom: '1.25rem' }}>
+          Export your steps data from Apple Health on your iPhone to a CSV file (e.g. using the 100% free app <strong>QS Access</strong>), and upload it here to sync your steps history automatically!
         </p>
 
-        <div style={{ backgroundColor: 'var(--bg-tertiary)', border: '1px solid var(--border)', borderRadius: 'var(--radius-md)', padding: '1.25rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.75rem' }}>
-            <div>
-              <span style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-muted)', display: 'block', marginBottom: '0.25rem' }}>CONNECTION STATUS</span>
-              {user?.isGoogleFitConnected ? (
-                <span style={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--success)', display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
-                  ● Connected to Google Fit
-                </span>
-              ) : (
-                <span style={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
-                  ● Disconnected
-                </span>
-              )}
-            </div>
-            
-            {!user?.isGoogleFitConnected ? (
-              <button 
-                onClick={handleConnectGoogleFit} 
-                className="btn btn-primary"
-                style={{ padding: '0.6rem 1.25rem', fontSize: '0.85rem' }}
-                disabled={simLoading}
-              >
-                Connect Google Fit
-              </button>
-            ) : (
-              <div style={{ display: 'flex', gap: '0.5rem' }}>
-                <button 
-                  onClick={handleSyncGoogleFit} 
-                  className="btn btn-primary"
-                  style={{ padding: '0.6rem 1.25rem', fontSize: '0.85rem', backgroundColor: 'var(--success)' }}
-                  disabled={simLoading}
-                >
-                  Sync Steps Now
-                </button>
-                <button 
-                  onClick={handleDisconnectGoogleFit} 
-                  className="btn btn-secondary"
-                  style={{ padding: '0.6rem 1.25rem', fontSize: '0.85rem', color: 'var(--danger)' }}
-                  disabled={simLoading}
-                >
-                  Disconnect
-                </button>
-              </div>
-            )}
+        <div style={{ backgroundColor: 'var(--bg-tertiary)', border: '1px solid var(--border)', borderRadius: 'var(--radius-md)', padding: '1.25rem' }}>
+          <label className="form-label" style={{ fontWeight: 600, color: 'var(--text-secondary)', display: 'block', marginBottom: '0.5rem' }}>
+            SELECT EXPORTED CSV FILE
+          </label>
+          <input 
+            type="file" 
+            accept=".csv" 
+            onChange={handleCSVUpload} 
+            disabled={simLoading}
+            style={{
+              width: '100%',
+              fontSize: '0.85rem',
+              color: 'var(--text-primary)',
+              backgroundColor: 'var(--bg-secondary)',
+              border: '1px solid var(--border)',
+              borderRadius: 'var(--radius-md)',
+              padding: '0.5rem',
+              cursor: 'pointer'
+            }}
+          />
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem', marginTop: '0.85rem', fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+            <span>💡 <strong>Free iPhone App Suggestion:</strong> Search the App Store for <strong>QS Access</strong> (free, no ads).</span>
+            <span>1. Open QS Access ➔ Check <strong>Steps</strong>.</span>
+            <span>2. Choose <strong>1 Day</strong> frequency and tap <strong>Create Table</strong>.</span>
+            <span>3. Tap the Share icon (top-right) and upload that file here!</span>
           </div>
         </div>
       </div>
