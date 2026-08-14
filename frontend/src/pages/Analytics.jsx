@@ -61,12 +61,12 @@ const Analytics = () => {
   // Filter helper for selected month & year (YYYY-MM-DD matches YYYY-MM)
   const prefix = `${selectedYear}-${String(selectedMonth + 1).padStart(2, '0')}`;
   
-  const filteredExpenses = Array.isArray(expenses) ? expenses.filter(exp => exp && exp.date && exp.date.startsWith(prefix)) : [];
-  const filteredAttendance = Array.isArray(attendance) ? attendance.filter(att => att && att.date && att.date.startsWith(prefix)) : [];
-  const filteredActivities = Array.isArray(activities) ? activities.filter(act => act && act.date && act.date.startsWith(prefix)) : [];
+  const filteredExpenses = Array.isArray(expenses) ? expenses.filter(exp => exp && typeof exp.date === 'string' && exp.date.startsWith(prefix)) : [];
+  const filteredAttendance = Array.isArray(attendance) ? attendance.filter(att => att && typeof att.date === 'string' && att.date.startsWith(prefix)) : [];
+  const filteredActivities = Array.isArray(activities) ? activities.filter(act => act && typeof act.date === 'string' && act.date.startsWith(prefix)) : [];
   
   // Work sessions matching this month
-  const filteredWorkSessions = Array.isArray(workSessions) ? workSessions.filter(ws => ws && ws.date && ws.date.startsWith(prefix)) : [];
+  const filteredWorkSessions = Array.isArray(workSessions) ? workSessions.filter(ws => ws && typeof ws.date === 'string' && ws.date.startsWith(prefix)) : [];
 
   // Calendar calculations
   const totalDaysInMonth = new Date(selectedYear, selectedMonth + 1, 0).getDate();
@@ -112,22 +112,22 @@ const Analytics = () => {
   }));
 
   // Statistics Calculations
-  const totalOfficeDays = filteredAttendance.filter(att => att && att.officeDuration > 0).length;
-  const totalOfficeMs = filteredAttendance.reduce((sum, att) => sum + (att && att.officeDuration || 0), 0);
+  const totalOfficeDays = filteredAttendance.filter(att => att && Number(att.officeDuration || 0) > 0).length;
+  const totalOfficeMs = filteredAttendance.reduce((sum, att) => sum + Number(att && att.officeDuration || 0), 0);
   const totalOfficeHours = parseFloat((totalOfficeMs / 3600000).toFixed(1)) || 0;
   const avgOfficeHoursPerDay = totalOfficeDays > 0 ? (totalOfficeHours / totalOfficeDays).toFixed(1) : 0;
 
-  const totalWorkMs = filteredWorkSessions.reduce((sum, ws) => sum + (ws && ws.duration || 0), 0);
+  const totalWorkMs = filteredWorkSessions.reduce((sum, ws) => sum + Number(ws && ws.duration || 0), 0);
   const totalWorkHours = parseFloat((totalWorkMs / 3600000).toFixed(1)) || 0;
   const avgWorkHoursPerDay = totalOfficeDays > 0 ? (totalWorkHours / totalOfficeDays).toFixed(1) : totalDaysInMonth > 0 ? (totalWorkHours / totalDaysInMonth).toFixed(1) : 0;
 
-  const totalSteps = filteredActivities.reduce((sum, act) => sum + (act && act.steps || 0), 0);
-  const totalWalkingDistance = filteredActivities.reduce((sum, act) => sum + (act && act.walkingDistance || 0), 0);
-  const activeDays = filteredActivities.filter(act => act && act.steps > 0).length;
+  const totalSteps = filteredActivities.reduce((sum, act) => sum + Number(act && act.steps || 0), 0);
+  const totalWalkingDistance = filteredActivities.reduce((sum, act) => sum + Number(act && act.walkingDistance || 0), 0);
+  const activeDays = filteredActivities.filter(act => act && Number(act.steps || 0) > 0).length;
   const avgStepsPerDay = activeDays > 0 ? Math.round(totalSteps / activeDays) : 0;
   const avgDistancePerDay = activeDays > 0 ? (totalWalkingDistance / activeDays).toFixed(1) : 0;
 
-  const totalSpending = filteredExpenses.reduce((sum, exp) => sum + (exp && exp.amount || 0), 0);
+  const totalSpending = filteredExpenses.reduce((sum, exp) => sum + Number(exp && exp.amount || 0), 0);
   const avgSpendingPerDay = totalSpending > 0 ? Math.round(totalSpending / totalDaysInMonth) : 0;
 
   const formatTextReport = () => {
