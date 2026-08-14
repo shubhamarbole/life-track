@@ -391,11 +391,7 @@ const Dashboard = ({ user, triggerReloadUser }) => {
           z-index: 1;
           max-width: 100%;
           margin: 0;
-          background: #08080c;
-          border-radius: 20px;
-          border: 1px solid rgba(255, 255, 255, 0.08);
-          box-shadow: 0 30px 60px rgba(0, 0, 0, 0.8), inset 0 1px 0 0 rgba(255, 255, 255, 0.05);
-          padding: 2rem 1.5rem;
+          padding: 1rem 0;
           width: 100%;
         }
 
