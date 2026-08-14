@@ -6,7 +6,6 @@ import Header from './components/Header';
 // Pages
 import Dashboard from './pages/Dashboard';
 import History from './pages/History';
-import Analytics from './pages/Analytics';
 import Money from './pages/Money';
 import Settings from './pages/Settings';
 import Login from './pages/Login';
@@ -86,7 +85,6 @@ function App() {
               <Routes>
                 <Route path="/" element={<Dashboard user={user} triggerReloadUser={fetchUserProfile} />} />
                 <Route path="/history" element={<History />} />
-                <Route path="/analytics" element={<Analytics />} />
                 <Route path="/money" element={<Money />} />
                 <Route path="/settings" element={<Settings user={user} onLogout={handleLogout} triggerReloadUser={fetchUserProfile} />} />
                 <Route path="*" element={<Navigate to="/" replace />} />

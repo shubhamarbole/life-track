@@ -43,13 +43,7 @@ const Sidebar = ({ onLogout, user }) => {
           <Calendar size={20} />
           <span>History</span>
         </NavLink>
-        <NavLink 
-          to="/analytics" 
-          className={({ isActive }) => `sidebar-link ${isActive ? 'active' : ''}`}
-        >
-          <BarChart2 size={20} />
-          <span>Analytics</span>
-        </NavLink>
+
         <NavLink 
           to="/money" 
           className={({ isActive }) => `sidebar-link ${isActive ? 'active' : ''}`}

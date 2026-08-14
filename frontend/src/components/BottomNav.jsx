@@ -19,13 +19,7 @@ const BottomNav = () => {
         <Calendar />
         <span>History</span>
       </NavLink>
-      <NavLink 
-        to="/analytics" 
-        className={({ isActive }) => `bottom-nav-item ${isActive ? 'active' : ''}`}
-      >
-        <BarChart2 />
-        <span>Analytics</span>
-      </NavLink>
+
       <NavLink 
         to="/money" 
         className={({ isActive }) => `bottom-nav-item ${isActive ? 'active' : ''}`}

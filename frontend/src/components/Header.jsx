@@ -28,12 +28,7 @@ const Header = ({ theme, toggleTheme, user, onLogout }) => {
         >
           History
         </NavLink>
-        <NavLink 
-          to="/analytics" 
-          className={({ isActive }) => `navbar-pill-link ${isActive ? 'active' : ''}`}
-        >
-          Analytics
-        </NavLink>
+
         <NavLink 
           to="/money" 
           className={({ isActive }) => `navbar-pill-link ${isActive ? 'active' : ''}`}
