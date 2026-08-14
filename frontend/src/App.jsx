@@ -13,7 +13,7 @@ import Register from './pages/Register';
 
 function App() {
   const [user, setUser] = useState(null);
-  const [theme, setTheme] = useState(localStorage.getItem('lifetrack_theme') || 'light');
+  const theme = 'dark';
   const [authLoading, setAuthLoading] = useState(true);
 
   const token = localStorage.getItem('lifetrack_token');
@@ -55,10 +55,6 @@ function App() {
     localStorage.setItem('lifetrack_theme', theme);
   }, [theme]);
 
-  const toggleTheme = () => {
-    setTheme(prev => prev === 'light' ? 'dark' : 'light');
-  };
-
   const handleLoginSuccess = (userData) => {
     setUser(userData);
     fetchUserProfile(userData.token); // Reload with fresh token
@@ -79,7 +75,7 @@ function App() {
         {user ? (
           <>
             {/* Authenticated Layout */}
-            <Header theme={theme} toggleTheme={toggleTheme} user={user} onLogout={handleLogout} />
+            <Header theme={theme} user={user} onLogout={handleLogout} />
             
             <main className="main-content-streamline">
               <Routes>

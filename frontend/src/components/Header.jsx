@@ -1,8 +1,8 @@
 import React from 'react';
 import { NavLink } from 'react-router-dom';
-import { Sun, Moon, LogOut } from 'lucide-react';
+import { LogOut } from 'lucide-react';
 
-const Header = ({ theme, toggleTheme, user, onLogout }) => {
+const Header = ({ theme, user, onLogout }) => {
   return (
     <header className="app-header-capsule">
       
@@ -45,14 +45,7 @@ const Header = ({ theme, toggleTheme, user, onLogout }) => {
 
       {/* Right side items: Theme toggler + Profile avatar greet + Logout */}
       <div className="navbar-right-group">
-        {/* Theme round toggle button */}
-        <button 
-          onClick={toggleTheme} 
-          className="navbar-round-btn"
-          title={theme === 'dark' ? 'Switch to Light Mode' : 'Switch to Dark Mode'}
-        >
-          {theme === 'dark' ? <Sun size={16} /> : <Moon size={16} />}
-        </button>
+
 
         {user && (
           <>
