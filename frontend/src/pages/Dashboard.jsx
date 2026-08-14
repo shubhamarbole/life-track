@@ -47,6 +47,22 @@ const Dashboard = ({ user, triggerReloadUser }) => {
         setAttendance(attData);
       }
 
+      // Background Google Fit sync if connected
+      if (user && user.isGoogleFitConnected) {
+        try {
+          await fetch('/api/auth/google/google-sync', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${token}`
+            },
+            body: JSON.stringify({ date: todayStr })
+          });
+        } catch (syncErr) {
+          console.warn('Background Google Fit sync failed:', syncErr);
+        }
+      }
+
       // Get today's activity
       const activityRes = await fetch(`/api/activity/today?date=${todayStr}`, { headers });
       if (activityRes.ok) {

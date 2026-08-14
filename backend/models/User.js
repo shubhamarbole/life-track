@@ -29,6 +29,19 @@ const userSchema = new mongoose.Schema({
     type: Number,
     default: 8, // in hours
   },
+  googleAccessToken: {
+    type: String,
+  },
+  googleRefreshToken: {
+    type: String,
+  },
+  googleTokenExpiry: {
+    type: Date,
+  },
+  isGoogleFitConnected: {
+    type: Boolean,
+    default: false,
+  },
   createdAt: {
     type: Date,
     default: Date.now,

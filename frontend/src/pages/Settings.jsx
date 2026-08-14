@@ -75,6 +75,72 @@ const Settings = ({ user, onLogout, triggerReloadUser }) => {
     );
   };
 
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('google') === 'success') {
+      setSettingsSuccess('Google Fit connected successfully!');
+      window.history.replaceState({}, document.title, window.location.pathname);
+      triggerReloadUser();
+      setTimeout(() => setSettingsSuccess(''), 5000);
+    } else if (params.get('google') === 'error') {
+      alert('Failed to connect to Google Fit. Please verify your client credentials and try again.');
+      window.history.replaceState({}, document.title, window.location.pathname);
+    }
+  }, []);
+
+  const handleConnectGoogleFit = () => {
+    window.location.href = `/api/auth/google/login?token=${token}`;
+  };
+
+  const handleSyncGoogleFit = async () => {
+    setSimLoading(true);
+    setSimSuccess('');
+    try {
+      const response = await fetch('/api/auth/google/google-sync', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ date: todayStr })
+      });
+      const data = await response.json();
+      if (!response.ok) {
+        throw new Error(data.message || 'Sync failed');
+      }
+      setSimSuccess(`Google Fit Synced! Today's Steps: ${data.steps.toLocaleString()}`);
+      triggerReloadUser();
+      setTimeout(() => setSimSuccess(''), 5000);
+    } catch (err) {
+      alert(err.message);
+    } finally {
+      setSimLoading(false);
+    }
+  };
+
+  const handleDisconnectGoogleFit = async () => {
+    if (!window.confirm('Are you sure you want to disconnect Google Fit?')) return;
+    setSimLoading(true);
+    try {
+      const response = await fetch('/api/auth/google/disconnect', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      if (!response.ok) {
+        throw new Error('Failed to disconnect');
+      }
+      setSettingsSuccess('Google Fit disconnected successfully!');
+      triggerReloadUser();
+      setTimeout(() => setSettingsSuccess(''), 3000);
+    } catch (err) {
+      alert(err.message);
+    } finally {
+      setSimLoading(false);
+    }
+  };
+
   // Update Settings API
   const handleSaveSettings = async (e) => {
     e.preventDefault();
@@ -348,46 +414,61 @@ const Settings = ({ user, onLogout, triggerReloadUser }) => {
         </div>
       </div>
 
-      {/* 2.5 iPhone Apple Health Auto-Sync */}
+      {/* 2.5 Google Fit Background Sync */}
       <div className="card">
         <h3 style={{ fontSize: '1.1rem', fontWeight: 700, marginBottom: '0.5rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
           <Compass size={20} style={{ color: 'var(--primary)' }} />
-          iPhone Apple Health Auto-Sync
+          Google Fit Background Sync
         </h3>
         <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginBottom: '1rem' }}>
-          Automatically sync your actual iPhone steps to this app using the built-in iOS Shortcuts app.
+          Automatically synchronize step counts and walking distance from your iPhone/Android using Google Fit in the background. 
+          <em> (Make sure you enable "Sync with Apple Health" inside the Google Fit app on iOS).</em>
         </p>
-        
-        <div style={{ backgroundColor: 'var(--bg-tertiary)', border: '1px solid var(--border)', borderRadius: 'var(--radius-md)', padding: '1rem' }}>
-          <span style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-secondary)' }}>YOUR SECURITY ACCESS TOKEN</span>
-          <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.5rem' }}>
-            <input 
-              type="text" 
-              readOnly 
-              value={token || ''} 
-              style={{
-                flex: 1,
-                fontSize: '0.75rem',
-                fontFamily: 'monospace',
-                backgroundColor: 'var(--bg-secondary)',
-                border: '1px solid var(--border)',
-                borderRadius: 'var(--radius-sm)',
-                padding: '0.5rem',
-                color: 'var(--text-secondary)',
-                overflow: 'hidden',
-                textOverflow: 'ellipsis'
-              }}
-            />
-            <button 
-              onClick={() => {
-                navigator.clipboard.writeText(token);
-                alert("Security Token copied to clipboard! You can paste it into your iOS Shortcuts setup.");
-              }} 
-              className="btn btn-secondary" 
-              style={{ padding: '0.5rem 1rem', fontSize: '0.8rem', whiteSpace: 'nowrap' }}
-            >
-              Copy Token
-            </button>
+
+        <div style={{ backgroundColor: 'var(--bg-tertiary)', border: '1px solid var(--border)', borderRadius: 'var(--radius-md)', padding: '1.25rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.75rem' }}>
+            <div>
+              <span style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-muted)', display: 'block', marginBottom: '0.25rem' }}>CONNECTION STATUS</span>
+              {user?.isGoogleFitConnected ? (
+                <span style={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--success)', display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
+                  ● Connected to Google Fit
+                </span>
+              ) : (
+                <span style={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
+                  ● Disconnected
+                </span>
+              )}
+            </div>
+            
+            {!user?.isGoogleFitConnected ? (
+              <button 
+                onClick={handleConnectGoogleFit} 
+                className="btn btn-primary"
+                style={{ padding: '0.6rem 1.25rem', fontSize: '0.85rem' }}
+                disabled={simLoading}
+              >
+                Connect Google Fit
+              </button>
+            ) : (
+              <div style={{ display: 'flex', gap: '0.5rem' }}>
+                <button 
+                  onClick={handleSyncGoogleFit} 
+                  className="btn btn-primary"
+                  style={{ padding: '0.6rem 1.25rem', fontSize: '0.85rem', backgroundColor: 'var(--success)' }}
+                  disabled={simLoading}
+                >
+                  Sync Steps Now
+                </button>
+                <button 
+                  onClick={handleDisconnectGoogleFit} 
+                  className="btn btn-secondary"
+                  style={{ padding: '0.6rem 1.25rem', fontSize: '0.85rem', color: 'var(--danger)' }}
+                  disabled={simLoading}
+                >
+                  Disconnect
+                </button>
+              </div>
+            )}
           </div>
         </div>
       </div>
