@@ -326,146 +326,389 @@ const Dashboard = ({ user, triggerReloadUser }) => {
     return <div style={{ padding: '2rem', textAlign: 'center' }}>Loading Dashboard...</div>;
   }
 
-  return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
-      
-      {/* 1. Dashboard Overview Header Section (Mockup Design) */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1.25rem' }}>
-        <div>
-          <h2 style={{ fontSize: '2.25rem', fontWeight: 800, color: 'var(--text-primary)', fontFamily: 'var(--font-display)', letterSpacing: '-0.02em' }}>
-            Dashboard Overview
-          </h2>
-          <p style={{ color: 'var(--text-secondary)', fontSize: '0.95rem', marginTop: '0.25rem' }}>
-            Monitor your personal routines and budget in real-time
-          </p>
-        </div>
+  const getOfficeMs = () => {
+    if (!attendance) return 0;
+    if (attendance.departureTime) return attendance.officeDuration;
+    const duration = new Date().getTime() - new Date(attendance.arrivalTime).getTime();
+    return duration > 0 ? duration : 0;
+  };
 
-        {/* Right Header filters (Mockup buttons) */}
-        <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center' }}>
-          {/* Timeframe selector */}
+  const officeMs = getOfficeMs();
+  const officePercent = Math.min(100, Math.round((officeMs / (8 * 3600000)) * 100)); // Target 8 hrs
+  const stepsPercent = Math.min(100, Math.round(((activity?.steps || 0) / 8000) * 100)); // Target 8000
+  const budgetPercent = Math.min(100, Math.round((Math.max(0, 10000 - spending.monthlyTotal) / 10000) * 100)); // Target 10k budget remaining
+
+  const getHeaderDate = () => {
+    const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    const d = new Date();
+    return `${days[d.getDay()]}, ${months[d.getMonth()]} ${d.getDate()}`;
+  };
+
+  return (
+    <div className="dashboard-wrapper-dark">
+      {/* Radial glow background washes */}
+      <div className="glow-wash-1"></div>
+      <div className="glow-wash-2"></div>
+
+      <style>{`
+        .dashboard-wrapper-dark {
+          position: relative;
+          background-color: #000000;
+          color: #ffffff;
+          min-height: 100vh;
+          padding: 1.5rem 1rem;
+          font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Icons", "Helvetica Neue", Helvetica, Arial, sans-serif;
+          overflow: hidden;
+        }
+
+        .glow-wash-1 {
+          position: absolute;
+          top: -10%;
+          right: -10%;
+          width: 300px;
+          height: 300px;
+          background: radial-gradient(circle, rgba(139, 92, 246, 0.15) 0%, rgba(0,0,0,0) 70%);
+          pointer-events: none;
+          z-index: 0;
+          filter: blur(40px);
+        }
+
+        .glow-wash-2 {
+          position: absolute;
+          bottom: 10%;
+          left: -10%;
+          width: 350px;
+          height: 350px;
+          background: radial-gradient(circle, rgba(6, 182, 212, 0.1) 0%, rgba(0,0,0,0) 70%);
+          pointer-events: none;
+          z-index: 0;
+          filter: blur(40px);
+        }
+
+        .phone-tilt-wrapper {
+          position: relative;
+          z-index: 1;
+          max-width: 450px;
+          margin: 0 auto;
+          background: #08080c;
+          border-radius: 40px;
+          border: 1px solid rgba(255, 255, 255, 0.08);
+          box-shadow: 0 30px 60px rgba(0, 0, 0, 0.8), inset 0 1px 0 0 rgba(255, 255, 255, 0.05);
+          padding: 2rem 1.25rem;
+          transition: transform 0.6s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.6s ease;
+        }
+
+        @media (min-width: 768px) {
+          .phone-tilt-wrapper {
+            transform: perspective(1200px) rotateX(4deg) rotateY(-5deg) rotateZ(1.2deg);
+          }
+          .phone-tilt-wrapper:hover {
+            transform: perspective(1200px) rotateX(0deg) rotateY(0deg) rotateZ(0deg);
+            box-shadow: 0 40px 80px rgba(0, 0, 0, 0.9);
+          }
+        }
+
+        .glass-card-raised {
+          background: linear-gradient(135deg, rgba(28, 28, 30, 0.8) 0%, rgba(18, 18, 20, 0.95) 100%);
+          border: 1px solid rgba(255, 255, 255, 0.06);
+          box-shadow: inset 0 1px 0 0 rgba(255, 255, 255, 0.1), 0 8px 24px rgba(0, 0, 0, 0.5);
+          border-radius: 20px;
+          padding: 1.25rem;
+          backdrop-filter: blur(20px);
+          transition: transform 0.3s ease, box-shadow 0.3s ease;
+        }
+
+        .glass-card-raised:hover {
+          transform: translateY(-2px);
+          box-shadow: inset 0 1px 0 0 rgba(255, 255, 255, 0.15), 0 12px 30px rgba(0, 0, 0, 0.6);
+        }
+
+        .icon-chip-glow {
+          width: 36px;
+          height: 36px;
+          border-radius: 10px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          color: #ffffff;
+        }
+
+        .icon-chip-glow.purple {
+          background: rgba(168, 85, 247, 0.2);
+          border: 1px solid rgba(168, 85, 247, 0.4);
+          filter: drop-shadow(0 0 6px rgba(168, 85, 247, 0.7));
+        }
+
+        .icon-chip-glow.orange {
+          background: rgba(245, 158, 11, 0.2);
+          border: 1px solid rgba(245, 158, 11, 0.4);
+          filter: drop-shadow(0 0 6px rgba(245, 158, 11, 0.7));
+        }
+
+        .icon-chip-glow.green {
+          background: rgba(16, 185, 129, 0.2);
+          border: 1px solid rgba(16, 185, 129, 0.4);
+          filter: drop-shadow(0 0 6px rgba(16, 185, 129, 0.7));
+        }
+
+        .icon-chip-glow.red {
+          background: rgba(239, 68, 68, 0.2);
+          border: 1px solid rgba(239, 68, 68, 0.4);
+          filter: drop-shadow(0 0 6px rgba(239, 68, 68, 0.7));
+        }
+
+        .search-container {
+          display: flex;
+          align-items: center;
+          background-color: #1c1c1e;
+          border-radius: 10px;
+          padding: 0.5rem 0.75rem;
+          margin-bottom: 1.5rem;
+          border: 1px solid rgba(255,255,255,0.03);
+        }
+
+        .search-input {
+          background: transparent;
+          border: none;
+          color: #ffffff;
+          font-size: 0.9rem;
+          margin-left: 0.5rem;
+          width: 100%;
+          outline: none;
+        }
+
+        .search-input::placeholder {
+          color: #8e8e93;
+        }
+      `}</style>
+
+      {/* 3D phone wrapper */}
+      <div className="phone-tilt-wrapper">
+        
+        {/* Date Greet Row */}
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
+          <span style={{ fontSize: '0.8rem', color: '#8e8e93', fontWeight: 500 }}>{getHeaderDate()}</span>
           <div style={{
-            position: 'relative',
+            width: '32px',
+            height: '32px',
+            borderRadius: '50%',
+            background: 'linear-gradient(135deg, #3b82f6, #8b5cf6)',
             display: 'flex',
             alignItems: 'center',
-            backgroundColor: 'var(--bg-secondary)',
-            border: '1px solid var(--border)',
-            borderRadius: 'var(--radius-full)',
-            padding: '0.5rem 1.25rem',
+            justifyContent: 'center',
             fontSize: '0.85rem',
-            fontWeight: 600,
-            color: 'var(--text-secondary)',
-            cursor: 'pointer'
+            fontWeight: 700,
+            color: '#fff',
+            filter: 'drop-shadow(0 0 6px rgba(139, 92, 246, 0.6))'
           }}>
-            <span>This Month</span>
-            <ChevronDown size={14} style={{ marginLeft: '0.5rem' }} />
+            {user?.name ? user.name[0].toUpperCase() : 'U'}
+          </div>
+        </div>
+
+        {/* Title */}
+        <h1 style={{ fontSize: '2.25rem', fontWeight: 850, margin: '0 0 1rem 0', fontFamily: 'inherit', letterSpacing: '-0.03em' }}>
+          Summary
+        </h1>
+
+        {/* Search Bar */}
+        <div className="search-container">
+          <span style={{ color: '#8e8e93', fontSize: '0.85rem' }}>🔍</span>
+          <input type="text" className="search-input" placeholder="Search" />
+        </div>
+
+        {/* Rings Widget Card */}
+        <div className="glass-card-raised" style={{ marginBottom: '1.5rem' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+            <h3 style={{ fontSize: '1.05rem', fontWeight: 700, margin: 0 }}>Today's Rings</h3>
+            <span style={{ fontSize: '0.85rem', color: '#0a84ff', fontWeight: 600, cursor: 'pointer' }}>Show More ›</span>
           </div>
 
-          {/* Filter button */}
-          <button className="btn btn-primary" style={{ borderRadius: 'var(--radius-full)', padding: '0.5rem 1.25rem', fontSize: '0.85rem', display: 'flex', gap: '0.4rem', alignItems: 'center' }}>
-            <Filter size={14} /> Filter
-          </button>
-        </div>
-      </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '1.75rem' }}>
+            {/* SVG Concentric Activity Rings */}
+            <div style={{ flexShrink: 0, position: 'relative', width: '130px', height: '130px' }}>
+              <svg width="130" height="130" viewBox="0 0 130 130">
+                {/* Background tracks */}
+                <circle cx="65" cy="65" r="50" fill="none" stroke="rgba(255, 45, 85, 0.12)" strokeWidth="12" />
+                <circle cx="65" cy="65" r="36" fill="none" stroke="rgba(76, 217, 100, 0.12)" strokeWidth="12" />
+                <circle cx="65" cy="65" r="22" fill="none" stroke="rgba(90, 200, 250, 0.12)" strokeWidth="12" />
 
-      {/* Geofence Alert Ribbon (Optional banner if warning present) */}
-      {trackingEnabled && (geoError || geoStatus === 'Config Required') && (
-        <div style={{ padding: '0.75rem 1.25rem', backgroundColor: 'var(--warning-light)', color: 'var(--warning)', borderRadius: 'var(--radius-md)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '1rem', fontSize: '0.85rem', border: '1px solid var(--warning)', flexWrap: 'wrap' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flex: 1 }}>
-            <AlertTriangle size={16} style={{ flexShrink: 0 }} />
-            <span>
-              {geoStatus === 'Config Required' ? (
-                'Office coordinates are not configured. Please set your office location in settings.'
-              ) : (
-                <>
-                  <strong>Location tracking disabled:</strong> {geoError || 'Permission denied.'}
-                  {geoError && (geoError.toLowerCase().includes('secure origin') || geoError.toLowerCase().includes('origin')) && (
-                    <div style={{ marginTop: '0.25rem', fontSize: '0.78rem', color: 'var(--warning)', opacity: 0.9 }}>
-                      Tip: Geolocation requires a secure origin (HTTPS or localhost). If testing on a local IP, use <code>http://localhost:3000</code> or enable <code>chrome://flags/#unsafely-treat-insecure-origin-as-secure</code>.
-                    </div>
-                  )}
-                </>
-              )}
+                {/* Foreground progress loops */}
+                {/* Office Progress - Pink */}
+                <circle
+                  cx="65"
+                  cy="65"
+                  r="50"
+                  fill="none"
+                  stroke="#ff2d55"
+                  strokeWidth="12"
+                  strokeDasharray={2 * Math.PI * 50}
+                  strokeDashoffset={2 * Math.PI * 50 - (Math.min(officePercent / 100, 0.999) * (2 * Math.PI * 50))}
+                  strokeLinecap="round"
+                  transform="rotate(-90 65 65)"
+                  style={{ filter: 'drop-shadow(0 0 6px #ff2d55)', transition: 'stroke-dashoffset 0.5s ease-in-out' }}
+                />
+                {/* Steps Progress - Green */}
+                <circle
+                  cx="65"
+                  cy="65"
+                  r="36"
+                  fill="none"
+                  stroke="#4cd964"
+                  strokeWidth="12"
+                  strokeDasharray={2 * Math.PI * 36}
+                  strokeDashoffset={2 * Math.PI * 36 - (Math.min(stepsPercent / 100, 0.999) * (2 * Math.PI * 36))}
+                  strokeLinecap="round"
+                  transform="rotate(-90 65 65)"
+                  style={{ filter: 'drop-shadow(0 0 6px #4cd964)', transition: 'stroke-dashoffset 0.5s ease-in-out' }}
+                />
+                {/* Budget Progress - Cyan */}
+                <circle
+                  cx="65"
+                  cy="65"
+                  r="22"
+                  fill="none"
+                  stroke="#5ac8fa"
+                  strokeWidth="12"
+                  strokeDasharray={2 * Math.PI * 22}
+                  strokeDashoffset={2 * Math.PI * 22 - (Math.min(budgetPercent / 100, 0.999) * (2 * Math.PI * 22))}
+                  strokeLinecap="round"
+                  transform="rotate(-90 65 65)"
+                  style={{ filter: 'drop-shadow(0 0 6px #5ac8fa)', transition: 'stroke-dashoffset 0.5s ease-in-out' }}
+                />
+              </svg>
+            </div>
+
+            {/* Labels and values */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem', fontSize: '0.85rem', flex: 1 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                <span style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: '#ff2d55', filter: 'drop-shadow(0 0 3px #ff2d55)' }}></span>
+                <span style={{ color: '#8e8e93' }}>Office Time</span>
+                <span style={{ fontWeight: 600, marginLeft: 'auto' }}>{getOfficeDuration()}/8h</span>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                <span style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: '#4cd964', filter: 'drop-shadow(0 0 3px #4cd964)' }}></span>
+                <span style={{ color: '#8e8e93' }}>Steps</span>
+                <span style={{ fontWeight: 600, marginLeft: 'auto' }}>{activity?.steps?.toLocaleString() || 0}/8,000</span>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                <span style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: '#5ac8fa', filter: 'drop-shadow(0 0 3px #5ac8fa)' }}></span>
+                <span style={{ color: '#8e8e93' }}>Budget Left</span>
+                <span style={{ fontWeight: 600, marginLeft: 'auto' }}>{budgetPercent}%</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Favorites Header */}
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
+          <h2 style={{ fontSize: '1.35rem', fontWeight: 800, margin: 0, letterSpacing: '-0.02em' }}>Favorites</h2>
+          <span style={{ fontSize: '0.9rem', color: '#0a84ff', fontWeight: 600, cursor: 'pointer' }}>Edit</span>
+        </div>
+
+        {/* Favorites Grid */}
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '1.5rem' }}>
+          {/* Office Time Card */}
+          <div className="glass-card-raised" style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
+            <div className="icon-chip-glow purple">
+              <Building size={18} />
+            </div>
+            <span style={{ fontSize: '0.75rem', fontWeight: 600, color: '#8e8e93', marginTop: '0.25rem' }}>Office Time</span>
+            <h4 style={{ fontSize: '1.5rem', fontWeight: 850, margin: 0 }}>{getOfficeDuration()}</h4>
+            <span style={{ fontSize: '0.7rem', color: '#636366', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+              {attendance ? `Arrival ${new Date(attendance.arrivalTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }).toLowerCase()}` : 'Not checked in'}
             </span>
           </div>
-          <Link to="/settings" style={{ color: 'var(--warning)', fontWeight: 600, textDecoration: 'underline', whiteSpace: 'nowrap' }}>
-            Go to Settings
-          </Link>
-        </div>
-      )}
 
-      {/* 2. Streamline Metrics Cards Grid (Mockup Layout) */}
-      <div className="streamline-grid">
-        
-        {/* Card 1: Office Duration (Primary Blue Card) */}
-        <div className="card-streamline primary-blue">
-          <div className="card-streamline-left">
-            <span className="card-streamline-label">Total Office Time</span>
-            <h3 className="card-streamline-metric">{getOfficeDuration()}</h3>
-            <span className="card-streamline-subtext">
-              {attendance ? `Arrival: ${new Date(attendance.arrivalTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}` : 'Not checked in'}
-            </span>
-          </div>
-          <div className="card-streamline-icon-wrapper white">
-            <Building size={20} />
-          </div>
-        </div>
-
-        {/* Card 2: Activity Steps (Light Card + Black icon) */}
-        <div className="card-streamline">
-          <div className="card-streamline-left">
-            <span className="card-streamline-label">Activity Steps</span>
-            <h3 className="card-streamline-metric">{activity?.steps?.toLocaleString() || '0'}</h3>
-            <span className="card-streamline-subtext">
+          {/* Steps Card */}
+          <div className="glass-card-raised" style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
+            <div className="icon-chip-glow orange">
+              <Footprints size={18} />
+            </div>
+            <span style={{ fontSize: '0.75rem', fontWeight: 600, color: '#8e8e93', marginTop: '0.25rem' }}>Steps</span>
+            <h4 style={{ fontSize: '1.5rem', fontWeight: 850, margin: 0 }}>{activity?.steps?.toLocaleString() || '0'}</h4>
+            <span style={{ fontSize: '0.7rem', color: '#636366' }}>
               Dist: {activity?.walkingDistance?.toFixed(1) || 0.0} km
             </span>
           </div>
-          <div className="card-streamline-icon-wrapper black">
-            <Footprints size={20} />
-          </div>
-        </div>
 
-        {/* Card 3: Working Time (Light Card + Blue icon + Blue Metric) */}
-        <div className="card-streamline">
-          <div className="card-streamline-left">
-            <span className="card-streamline-label">Working Hours</span>
-            <h3 className="card-streamline-metric blue">{formatDuration(getTotalWorkDuration())}</h3>
-            <span className="card-streamline-subtext">
+          {/* Spending Card */}
+          <div className="glass-card-raised" style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
+            <div className="icon-chip-glow green">
+              <Wallet size={18} />
+            </div>
+            <span style={{ fontSize: '0.75rem', fontWeight: 600, color: '#8e8e93', marginTop: '0.25rem' }}>Spending</span>
+            <h4 style={{ fontSize: '1.5rem', fontWeight: 850, margin: 0 }}>₹{spending.todayTotal}</h4>
+            <span style={{ fontSize: '0.7rem', color: '#636366' }}>
+              Limit left: ₹{Math.max(0, 10000 - spending.monthlyTotal).toLocaleString()}
+            </span>
+          </div>
+
+          {/* Work Sessions Card */}
+          <div className="glass-card-raised" style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
+            <div className="icon-chip-glow red">
+              <Clock size={18} />
+            </div>
+            <span style={{ fontSize: '0.75rem', fontWeight: 600, color: '#8e8e93', marginTop: '0.25rem' }}>Work Hours</span>
+            <h4 style={{ fontSize: '1.5rem', fontWeight: 850, margin: 0 }}>{formatDuration(getTotalWorkDuration())}</h4>
+            <span style={{ fontSize: '0.7rem', color: '#636366' }}>
               Coding: {formatDuration(catWorkTotals.Coding)}
             </span>
           </div>
-          <div className="card-streamline-icon-wrapper blue">
-            <Clock size={20} />
+        </div>
+
+        {/* Highlights Header */}
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
+          <h2 style={{ fontSize: '1.35rem', fontWeight: 800, margin: 0, letterSpacing: '-0.02em' }}>Highlights</h2>
+        </div>
+
+        {/* Highlights List Card */}
+        <div className="glass-card-raised" style={{ display: 'flex', flexDirection: 'column', gap: '1rem', marginBottom: '1.5rem' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.85rem' }}>
+            <div className="icon-chip-glow purple">
+              <Building size={16} />
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column' }}>
+              <span style={{ fontSize: '0.85rem', fontWeight: 600 }}>First arrival</span>
+              <span style={{ fontSize: '0.75rem', color: '#8e8e93' }}>
+                {attendance ? `Today, ${new Date(attendance.arrivalTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }).toLowerCase()}` : 'Not checked in yet'}
+              </span>
+            </div>
+          </div>
+
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.85rem', borderTop: '1px solid rgba(255,255,255,0.06)', paddingTop: '1rem' }}>
+            <div className="icon-chip-glow orange">
+              <Footprints size={16} />
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column' }}>
+              <span style={{ fontSize: '0.85rem', fontWeight: 600 }}>Step logs</span>
+              <span style={{ fontSize: '0.75rem', color: '#8e8e93' }}>
+                {activity?.steps > 0 ? `Today: ${activity.steps.toLocaleString()} steps logged` : 'No steps recorded today'}
+              </span>
+            </div>
+          </div>
+
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.85rem', borderTop: '1px solid rgba(255,255,255,0.06)', paddingTop: '1rem' }}>
+            <div className="icon-chip-glow green">
+              <Wallet size={16} />
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column' }}>
+              <span style={{ fontSize: '0.85rem', fontWeight: 600 }}>On track with budget</span>
+              <span style={{ fontSize: '0.75rem', color: '#8e8e93' }}>
+                Spent ₹{spending.monthlyTotal.toLocaleString()} of ₹10,000 limit
+              </span>
+            </div>
           </div>
         </div>
 
-        {/* Card 4: Daily Spending (Light Card + Black icon) */}
-        <div className="card-streamline">
-          <div className="card-streamline-left">
-            <span className="card-streamline-label">Today's Spending</span>
-            <h3 className="card-streamline-metric">₹{spending.todayTotal}</h3>
-            <span className="card-streamline-subtext">
-              Monthly: ₹{spending.monthlyTotal}
-            </span>
+        {/* Geofence Status Toggle */}
+        <div className="glass-card-raised" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '1rem', marginBottom: '1.5rem' }}>
+          <div>
+            <h3 style={{ fontSize: '0.95rem', fontWeight: 700, margin: 0 }}>Geofence Check-in</h3>
+            <p style={{ fontSize: '0.75rem', color: '#8e8e93', margin: '0.15rem 0 0 0' }}>
+              GPS: {geoStatus}
+            </p>
           </div>
-          <div className="card-streamline-icon-wrapper black">
-            <Wallet size={20} strokeWidth={2} />
-          </div>
-        </div>
-
-      </div>
-
-      {/* Geofence Configuration Summary bar */}
-      <div className="card-glass" style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', gap: '1rem', borderLeft: '4px solid var(--primary)' }}>
-        <div>
-          <h3 style={{ fontSize: '1rem', display: 'flex', alignItems: 'center', gap: '0.5rem', fontWeight: 700 }}>
-            <MapPin size={18} className="anim-pulse" style={{ color: 'var(--primary)' }} />
-            Geofence Tracker Status
-          </h3>
-          <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginTop: '0.2rem' }}>
-            Current state: <strong>{geoStatus}</strong> {user?.officeLocation?.lat && user.officeLocation.lat !== 0 ? `(Target: ${user.officeLocation.lat.toFixed(3)}, ${user.officeLocation.lng.toFixed(3)})` : ''}
-          </p>
-        </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '1.25rem' }}>
           <label className="switch" style={{ position: 'relative', display: 'inline-block', width: '50px', height: '26px' }}>
             <input 
               type="checkbox" 
@@ -475,7 +718,7 @@ const Dashboard = ({ user, triggerReloadUser }) => {
             />
             <span className="slider" style={{
               position: 'absolute', cursor: 'pointer', top: 0, left: 0, right: 0, bottom: 0,
-              backgroundColor: trackingEnabled ? 'var(--primary)' : '#ccc', borderRadius: '34px',
+              backgroundColor: trackingEnabled ? '#34c759' : '#3a3a3c', borderRadius: '34px',
               transition: '.4s'
             }}>
               <span style={{
@@ -486,69 +729,57 @@ const Dashboard = ({ user, triggerReloadUser }) => {
             </span>
           </label>
         </div>
-      </div>
 
-      {/* Main Bottom Section: Work Session Tracker and Expense Visualizer */}
-      <div className="analytics-grid">
-        
-        {/* Work session tracker card */}
-        <div className="card">
-          <h3 style={{ fontSize: '1.1rem', fontWeight: 700, marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-            <Briefcase size={20} style={{ color: 'var(--primary)' }} />
+        {/* Controls: Work Session Stopwatch */}
+        <div className="glass-card-raised" style={{ marginBottom: '1.5rem' }}>
+          <h3 style={{ fontSize: '1.05rem', fontWeight: 700, marginBottom: '0.85rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+            <Clock size={18} style={{ color: '#ff2d55' }} />
             Work Session Timer
           </h3>
 
           {activeSession ? (
-            <div style={{ backgroundColor: 'var(--primary-light)', border: '1px solid var(--primary)', borderRadius: 'var(--radius-md)', padding: '1rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
+            <div style={{ backgroundColor: 'rgba(255, 45, 85, 0.1)', border: '1px solid rgba(255, 45, 85, 0.3)', borderRadius: '12px', padding: '0.85rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <div>
-                <span style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--primary)' }}>RUNNING SESSION</span>
-                <h4 style={{ fontSize: '1.1rem', fontWeight: 700 }}>{activeSession.category}</h4>
+                <span style={{ fontSize: '0.7rem', fontWeight: 600, color: '#ff2d55' }}>RUNNING SESSION</span>
+                <h4 style={{ fontSize: '1rem', fontWeight: 700, margin: '0.15rem 0 0 0' }}>{activeSession.category}</h4>
               </div>
-              <button onClick={handleStopWorkSession} className="btn btn-danger" style={{ display: 'flex', gap: '0.4rem', padding: '0.5rem 1rem', fontSize: '0.85rem' }}>
-                <Square size={16} /> Stop Session
+              <button onClick={handleStopWorkSession} className="btn btn-danger" style={{ display: 'flex', gap: '0.4rem', padding: '0.4rem 0.85rem', fontSize: '0.8rem', borderRadius: '8px' }}>
+                <Square size={14} /> Stop
               </button>
             </div>
           ) : (
-            <div style={{ marginBottom: '1.5rem' }}>
-              <p style={{ fontSize: '0.9rem', color: 'var(--text-secondary)', marginBottom: '0.85rem' }}>
-                Select a category to start tracking your working hours:
+            <div>
+              <p style={{ fontSize: '0.8rem', color: '#8e8e93', marginBottom: '0.85rem' }}>
+                Select a category to start tracking:
               </p>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '0.75rem' }}>
-                <button onClick={() => handleStartWorkSession('Coding')} className="btn btn-secondary" style={{ display: 'flex', gap: '0.4rem', justifyContent: 'flex-start', padding: '0.6rem 0.85rem' }}>
-                  <Code size={16} style={{ color: 'var(--primary)' }} /> Coding
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '0.5rem' }}>
+                <button onClick={() => handleStartWorkSession('Coding')} className="btn btn-secondary" style={{ display: 'flex', gap: '0.4rem', justifyContent: 'flex-start', padding: '0.5rem 0.75rem', fontSize: '0.8rem', backgroundColor: '#1c1c1e', border: '1px solid rgba(255,255,255,0.05)', color: '#fff' }}>
+                  <Code size={14} style={{ color: '#30d158' }} /> Coding
                 </button>
-                <button onClick={() => handleStartWorkSession('Learning')} className="btn btn-secondary" style={{ display: 'flex', gap: '0.4rem', justifyContent: 'flex-start', padding: '0.6rem 0.85rem' }}>
-                  <BookOpen size={16} style={{ color: 'var(--success)' }} /> Learning
+                <button onClick={() => handleStartWorkSession('Learning')} className="btn btn-secondary" style={{ display: 'flex', gap: '0.4rem', justifyContent: 'flex-start', padding: '0.5rem 0.75rem', fontSize: '0.8rem', backgroundColor: '#1c1c1e', border: '1px solid rgba(255,255,255,0.05)', color: '#fff' }}>
+                  <BookOpen size={14} style={{ color: '#0a84ff' }} /> Learning
                 </button>
-                <button onClick={() => handleStartWorkSession('Meeting')} className="btn btn-secondary" style={{ display: 'flex', gap: '0.4rem', justifyContent: 'flex-start', padding: '0.6rem 0.85rem' }}>
-                  <Users size={16} style={{ color: 'var(--warning)' }} /> Meeting
+                <button onClick={() => handleStartWorkSession('Meeting')} className="btn btn-secondary" style={{ display: 'flex', gap: '0.4rem', justifyContent: 'flex-start', padding: '0.5rem 0.75rem', fontSize: '0.8rem', backgroundColor: '#1c1c1e', border: '1px solid rgba(255,255,255,0.05)', color: '#fff' }}>
+                  <Users size={14} style={{ color: '#ffd60a' }} /> Meeting
                 </button>
-                <button onClick={() => handleStartWorkSession('Other')} className="btn btn-secondary" style={{ display: 'flex', gap: '0.4rem', justifyContent: 'flex-start', padding: '0.6rem 0.85rem' }}>
-                  <Clock size={16} style={{ color: 'var(--text-secondary)' }} /> Other
+                <button onClick={() => handleStartWorkSession('Other')} className="btn btn-secondary" style={{ display: 'flex', gap: '0.4rem', justifyContent: 'flex-start', padding: '0.5rem 0.75rem', fontSize: '0.8rem', backgroundColor: '#1c1c1e', border: '1px solid rgba(255,255,255,0.05)', color: '#fff' }}>
+                  <Clock size={14} style={{ color: '#8e8e93' }} /> Other
                 </button>
               </div>
             </div>
           )}
 
-          {/* Daily Work Sessions List */}
-          <h4 style={{ fontSize: '0.9rem', fontWeight: 700, color: 'var(--text-secondary)', borderTop: '1px solid var(--border)', paddingTop: '1rem', marginBottom: '0.75rem' }}>
-            Today's Sessions
-          </h4>
-          {workSessions.length === 0 ? (
-            <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', fontStyle: 'italic' }}>No work sessions logged today.</p>
-          ) : (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', maxHeight: '180px', overflowY: 'auto' }}>
+          {/* Today's Work list */}
+          {workSessions.length > 0 && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', marginTop: '1rem', borderTop: '1px solid rgba(255,255,255,0.06)', paddingTop: '0.85rem', maxHeight: '140px', overflowY: 'auto' }}>
               {workSessions.map((session, index) => (
-                <div key={session._id || index} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0.5rem 0.75rem', backgroundColor: 'var(--bg-tertiary)', borderRadius: 'var(--radius-sm)', fontSize: '0.8rem' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                    <span style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: session.category === 'Coding' ? 'var(--primary)' : session.category === 'Learning' ? 'var(--success)' : session.category === 'Meeting' ? 'var(--warning)' : 'var(--text-secondary)' }}></span>
-                    <span style={{ fontWeight: 600 }}>{session.category}</span>
-                    <span style={{ color: 'var(--text-muted)' }}>
-                      {new Date(session.startTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} - {session.endTime ? new Date(session.endTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'Active'}
-                    </span>
+                <div key={session._id || index} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.75rem', color: '#a1a1aa' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                    <span style={{ width: '6px', height: '6px', borderRadius: '50%', backgroundColor: session.category === 'Coding' ? '#30d158' : session.category === 'Learning' ? '#0a84ff' : session.category === 'Meeting' ? '#ffd60a' : '#8e8e93' }}></span>
+                    <span style={{ fontWeight: 600, color: '#fff' }}>{session.category}</span>
                   </div>
                   <span style={{ fontWeight: 700 }}>
-                    {session.endTime ? formatDuration(session.duration) : 'Tracking...'}
+                    {session.endTime ? formatDuration(session.duration) : 'Active'}
                   </span>
                 </div>
               ))}
@@ -556,62 +787,58 @@ const Dashboard = ({ user, triggerReloadUser }) => {
           )}
         </div>
 
-        {/* Expenses categories breakdown card */}
-        <div className="card" style={{ display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
-          <div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
-              <h3 style={{ fontSize: '1.1rem', fontWeight: 700 }}>Spending Breakdown (This Month)</h3>
-            </div>
-            
-            {Object.keys(spending.categoryTotals).length === 0 ? (
-              <div style={{ padding: '2rem 1rem', textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.85rem', fontStyle: 'italic' }}>
-                No expenses logged this month yet.
-              </div>
-            ) : (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem', marginBottom: '1.5rem' }}>
-                {Object.entries(spending.categoryTotals).map(([cat, amount]) => {
-                  const percent = Math.min(100, Math.round((amount / (spending.monthlyTotal || 1)) * 100));
-                  let color = 'var(--primary)';
-                  if (cat === 'Food') color = 'var(--warning)';
-                  if (cat === 'Travel') color = 'var(--success)';
-                  if (cat === 'Shopping') color = 'var(--danger)';
-                  if (cat === 'Bills') color = '#a855f7';
-
-                  return (
-                    <div key={cat} style={{ fontSize: '0.85rem' }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.25rem', fontWeight: 500 }}>
-                        <span>{cat}</span>
-                        <span style={{ fontWeight: 600 }}>₹{amount} ({percent}%)</span>
-                      </div>
-                      <div style={{ width: '100%', height: '8px', backgroundColor: 'var(--bg-tertiary)', borderRadius: 'var(--radius-full)', overflow: 'hidden' }}>
-                        <div style={{ width: `${percent}%`, height: '100%', backgroundColor: color, borderRadius: 'var(--radius-full)' }}></div>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
+        {/* Controls: Spending Category Breakdown */}
+        <div className="glass-card-raised">
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.85rem' }}>
+            <h3 style={{ fontSize: '1.05rem', fontWeight: 700, margin: 0 }}>Budget Allocation</h3>
+            <button 
+              onClick={() => setIsSpendingModalOpen(true)}
+              style={{
+                background: 'rgba(10, 132, 255, 0.15)',
+                border: 'none',
+                borderRadius: '8px',
+                color: '#0a84ff',
+                fontSize: '0.75rem',
+                fontWeight: 600,
+                padding: '0.35rem 0.75rem',
+                cursor: 'pointer'
+              }}
+            >
+              + Add Cost
+            </button>
           </div>
 
-          <button 
-            onClick={() => setIsSpendingModalOpen(true)}
-            className="btn btn-primary" 
-            style={{ width: '100%', display: 'flex', gap: '0.5rem', justifyContent: 'center' }}
-          >
-            <Plus size={18} />
-            <span>Add Today's Spending</span>
-          </button>
-        </div>
-      </div>
+          {Object.keys(spending.categoryTotals).length === 0 ? (
+            <div style={{ padding: '1rem 0', textAlign: 'center', color: '#8e8e93', fontSize: '0.8rem', fontStyle: 'italic' }}>
+              No expenses logged this month yet.
+            </div>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+              {Object.entries(spending.categoryTotals).map(([cat, amount]) => {
+                const percent = Math.min(100, Math.round((amount / (spending.monthlyTotal || 1)) * 100));
+                let color = '#0a84ff';
+                if (cat === 'Food') color = '#ffd60a';
+                if (cat === 'Travel') color = '#30d158';
+                if (cat === 'Shopping') color = '#ff453a';
+                if (cat === 'Bills') color = '#bf5af2';
 
-      {/* Floating Action Button (for mobile focus) */}
-      <button 
-        onClick={() => setIsSpendingModalOpen(true)} 
-        className="fab"
-        title="Add Expense"
-      >
-        <Plus size={24} />
-      </button>
+                return (
+                  <div key={cat} style={{ fontSize: '0.8rem' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.2rem' }}>
+                      <span style={{ fontWeight: 500 }}>{cat}</span>
+                      <span style={{ fontWeight: 600 }}>₹{amount} ({percent}%)</span>
+                    </div>
+                    <div style={{ width: '100%', height: '6px', backgroundColor: '#1c1c1e', borderRadius: '4px', overflow: 'hidden' }}>
+                      <div style={{ width: `${percent}%`, height: '100%', backgroundColor: color, borderRadius: '4px' }}></div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+
+      </div>
 
       <SpendingModal 
         isOpen={isSpendingModalOpen} 
