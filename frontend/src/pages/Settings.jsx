@@ -215,7 +215,8 @@ const Settings = ({ user, onLogout, triggerReloadUser }) => {
             officeHours: 0,
             workSessions: [],
             totalSpent: 0,
-            expensesList: []
+            expensesList: [],
+            workSummary: ''
           };
         }
         return daysMap[dateStr];
@@ -238,6 +239,7 @@ const Settings = ({ user, onLogout, triggerReloadUser }) => {
           rec.arrival = item.arrivalTime ? new Date(item.arrivalTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '';
           rec.departure = item.departureTime ? new Date(item.departureTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '';
           rec.officeHours = item.officeDuration ? (item.officeDuration / 3600000).toFixed(2) : 0;
+          rec.workSummary = item.workSummary || '';
         }
       });
 
@@ -284,7 +286,8 @@ const Settings = ({ user, onLogout, triggerReloadUser }) => {
         'Office Hours Logged',
         'Work Sessions Logged',
         'Total Money Spent (INR)',
-        'Expense Notes'
+        'Expense Notes',
+        'Daily Work Done Summary'
       ];
 
       // Data rows
@@ -300,7 +303,8 @@ const Settings = ({ user, onLogout, triggerReloadUser }) => {
           escapeCSV(rec.officeHours),
           escapeCSV(rec.workSessions.join('; ')),
           escapeCSV(rec.totalSpent),
-          escapeCSV(rec.expensesList.join('; '))
+          escapeCSV(rec.expensesList.join('; ')),
+          escapeCSV(rec.workSummary)
         ].join(',');
       });
 

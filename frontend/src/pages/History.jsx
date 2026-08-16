@@ -282,6 +282,19 @@ const History = () => {
 
             </div>
 
+            {/* Daily Office Work Summary Note */}
+            {selectedDayAttendance?.workSummary && (
+              <div style={{ padding: '1rem', backgroundColor: 'rgba(139, 92, 246, 0.08)', border: '1px solid rgba(139, 92, 246, 0.2)', borderRadius: 'var(--radius-md)', display: 'flex', gap: '0.75rem', alignItems: 'flex-start' }}>
+                <Building size={18} style={{ color: 'var(--primary)', marginTop: '0.15rem' }} />
+                <div>
+                  <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 600, display: 'block' }}>DAILY WORK DONE SUMMARY</span>
+                  <p style={{ fontSize: '0.9rem', color: 'var(--text-primary)', margin: '0.25rem 0 0 0', whiteSpace: 'pre-wrap', lineHeight: '1.4' }}>
+                    {selectedDayAttendance.workSummary}
+                  </p>
+                </div>
+              </div>
+            )}
+
             {/* Expenses List */}
             <div style={{ borderTop: '1px solid var(--border)', paddingTop: '1.25rem' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>

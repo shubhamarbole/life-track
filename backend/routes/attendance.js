@@ -89,6 +89,37 @@ router.post('/checkout', protect, async (req, res) => {
   }
 });
 
+// @desc    Update daily work summary note
+// @route   POST /api/attendance/summary
+// @access  Private
+router.post('/summary', protect, async (req, res) => {
+  try {
+    const { workSummary, date } = req.body;
+    const todayStr = date || new Date().toISOString().split('T')[0];
+
+    let attendance = await OfficeAttendance.findOne({
+      userId: req.user._id,
+      date: todayStr,
+    });
+
+    if (!attendance) {
+      attendance = new OfficeAttendance({
+        userId: req.user._id,
+        date: todayStr,
+        arrivalTime: new Date(),
+        workSummary: workSummary || '',
+      });
+    } else {
+      attendance.workSummary = workSummary || '';
+    }
+
+    await attendance.save();
+    res.json(attendance);
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+});
+
 // @desc    Get all attendance history
 // @route   GET /api/attendance/history
 // @access  Private

@@ -31,6 +31,18 @@ const Dashboard = ({ user, triggerReloadUser }) => {
   const [geoStatus, setGeoStatus] = useState('Off'); // Off, Active, Inside Office, Outside Office
   const [geoError, setGeoError] = useState('');
   
+  // Work done summaries
+  const [workSummaryText, setWorkSummaryText] = useState('');
+  const [savingSummary, setSavingSummary] = useState(false);
+
+  useEffect(() => {
+    if (attendance) {
+      setWorkSummaryText(attendance.workSummary || '');
+    } else {
+      setWorkSummaryText('');
+    }
+  }, [attendance]);
+
   const token = localStorage.getItem('lifetrack_token');
   const todayStr = new Date().toISOString().split('T')[0];
 
@@ -239,6 +251,33 @@ const Dashboard = ({ user, triggerReloadUser }) => {
     if (summaryRes.ok) {
       const spData = await summaryRes.json();
       setSpending(spData);
+    }
+  };
+
+  const handleSaveWorkSummary = async () => {
+    setSavingSummary(true);
+    try {
+      const headers = {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`
+      };
+      const res = await fetch('/api/attendance/summary', {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({ workSummary: workSummaryText, date: todayStr })
+      });
+      if (res.ok) {
+        const updatedAttendance = await res.json();
+        setAttendance(updatedAttendance);
+        alert('Daily work note saved successfully!');
+      } else {
+        alert('Failed to save work note.');
+      }
+    } catch (err) {
+      console.error(err);
+      alert('Error saving work note.');
+    } finally {
+      setSavingSummary(false);
     }
   };
 
@@ -675,6 +714,63 @@ const Dashboard = ({ user, triggerReloadUser }) => {
                   }}></span>
                 </span>
               </label>
+            </div>
+
+            {/* Daily Office Work Done Journal */}
+            <div className="glass-card-raised" style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <div className="icon-chip-glow purple" style={{ width: '28px', height: '28px' }}>
+                  <Briefcase size={14} />
+                </div>
+                <h3 style={{ fontSize: '1rem', fontWeight: 700, margin: 0 }}>Daily Work Done</h3>
+              </div>
+              
+              <p style={{ fontSize: '0.75rem', color: '#8e8e93', margin: 0 }}>
+                Write down what tasks you accomplished in the office today:
+              </p>
+
+              <textarea
+                value={workSummaryText}
+                onChange={(e) => setWorkSummaryText(e.target.value)}
+                placeholder="e.g. Completed onboarding documentation; Debugged native global fetch crash; Pushed CSV step sync fixes..."
+                style={{
+                  width: '100%',
+                  height: '80px',
+                  backgroundColor: '#1c1c1e',
+                  border: '1px solid rgba(255, 255, 255, 0.08)',
+                  borderRadius: '10px',
+                  padding: '0.6rem 0.85rem',
+                  color: '#ffffff',
+                  fontSize: '0.8rem',
+                  outline: 'none',
+                  resize: 'none',
+                  fontFamily: 'inherit',
+                  lineHeight: '1.4'
+                }}
+              />
+
+              <button
+                onClick={handleSaveWorkSummary}
+                disabled={savingSummary}
+                style={{
+                  background: '#0a84ff',
+                  border: 'none',
+                  borderRadius: '10px',
+                  color: '#ffffff',
+                  fontSize: '0.8rem',
+                  fontWeight: 600,
+                  padding: '0.5rem 1rem',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '0.4rem',
+                  transition: 'opacity 0.2s ease',
+                  width: '100%'
+                }}
+              >
+                {savingSummary ? 'Saving...' : 'Save Work Note'}
+              </button>
             </div>
 
           </div>

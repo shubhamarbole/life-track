@@ -21,6 +21,10 @@ const officeAttendanceSchema = new mongoose.Schema({
     type: Number, // in milliseconds
     default: 0,
   },
+  workSummary: {
+    type: String,
+    default: '',
+  },
 }, {
   timestamps: true
 });
