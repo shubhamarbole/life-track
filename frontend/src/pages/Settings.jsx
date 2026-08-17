@@ -31,6 +31,7 @@ const Settings = ({ user, onLogout, triggerReloadUser }) => {
   const [nativeSyncLoading, setNativeSyncLoading] = useState(false);
   const [nativeSyncStatus, setNativeSyncStatus] = useState('');
   const [hasNativeAuth, setHasNativeAuth] = useState(false);
+  const [copiedToken, setCopiedToken] = useState(false);
 
   useEffect(() => {
     if (isNativeApp()) {
@@ -39,6 +40,12 @@ const Settings = ({ user, onLogout, triggerReloadUser }) => {
       });
     }
   }, []);
+
+  const handleCopyToken = () => {
+    navigator.clipboard.writeText(token);
+    setCopiedToken(true);
+    setTimeout(() => setCopiedToken(false), 3000);
+  };
 
   const token = localStorage.getItem('lifetrack_token');
   const todayStr = new Date().toISOString().split('T')[0];
@@ -767,17 +774,40 @@ const Settings = ({ user, onLogout, triggerReloadUser }) => {
           </div>
         </div>
       ) : (
-        <div className="card">
+        <div className="card" style={{ borderLeft: '4px solid #007aff' }}>
           <h3 style={{ fontSize: '1.1rem', fontWeight: 700, marginBottom: '0.5rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-            <Award size={20} style={{ color: 'var(--text-muted)' }} />
-            Native Mobile Health Sync
+            <Award size={20} style={{ color: '#007aff' }} />
+            Automated iOS Shortcuts Step Sync
           </h3>
-          <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginBottom: '0.75rem' }}>
-            Direct background steps syncing via Apple HealthKit and Google Health Connect is available when running the application inside the mobile app wrapper.
+          <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginBottom: '1rem' }}>
+            Configure your iPhone to automatically fetch your steps from Apple Health and sync them in the background (e.g. daily at 11:00 PM) using the built-in <strong>Shortcuts</strong> app:
           </p>
-          <span style={{ fontSize: '0.75rem', color: 'var(--primary)', fontWeight: 600 }}>
-            💡 Run this web app in iOS/Android simulator or native build to enable.
-          </span>
+
+          <div style={{ backgroundColor: 'var(--bg-tertiary)', padding: '1rem', borderRadius: 'var(--radius-md)', fontSize: '0.8rem', border: '1px solid var(--border)', marginBottom: '1.25rem' }}>
+            <div style={{ fontWeight: 750, color: 'var(--text-primary)', marginBottom: '0.5rem' }}>📋 Step-by-step Setup:</div>
+            <ol style={{ paddingLeft: '1.2rem', margin: 0, display: 'flex', flexDirection: 'column', gap: '0.4rem', color: 'var(--text-secondary)' }}>
+              <li>Open the <strong>Shortcuts</strong> app on your iPhone.</li>
+              <li>Tap <strong>Automation</strong> (bottom center) ➔ <strong>New Automation</strong> ➔ <strong>Time of Day</strong> (e.g., 11:00 PM) ➔ Check <strong>Run Immediately</strong>.</li>
+              <li>Add Action: <strong>Find Health Samples</strong> (Type: <i>Steps</i>, Group by: <i>Days</i>, Sort: <i>Latest First</i>, Limit: <i>1</i>).</li>
+              <li>Add Action: <strong>Get Contents of URL</strong>:
+                <ul style={{ paddingLeft: '1rem', marginTop: '0.2rem', listStyleType: 'circle' }}>
+                  <li>URL: <code>https://my-life-track.onrender.com/api/activity/update</code></li>
+                  <li>Method: <code>POST</code></li>
+                  <li>Headers: <code>Authorization</code> = <code>Bearer [Your copied token]</code></li>
+                  <li>Request Body: <code>JSON</code> (Add Number <code>steps</code> = <i>Sample Value</i>, Text <code>date</code> = <i>Formatted Sample Date (yyyy-MM-dd)</i>)</li>
+                </ul>
+              </li>
+            </ol>
+          </div>
+
+          <button
+            onClick={handleCopyToken}
+            className="btn btn-primary"
+            style={{ width: '100%', display: 'flex', gap: '0.5rem', justifyContent: 'center', alignItems: 'center', backgroundColor: '#007aff', borderColor: '#007aff' }}
+          >
+            <span>📋</span>
+            <span>{copiedToken ? 'Shortcuts Token Copied!' : 'Copy Shortcuts API Token'}</span>
+          </button>
         </div>
       )}
 
