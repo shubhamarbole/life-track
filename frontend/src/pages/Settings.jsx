@@ -1,5 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { MapPin, ShieldAlert, Award, Compass, RefreshCw, Trash2, HelpCircle } from 'lucide-react';
+import { 
+  isNativeApp, 
+  requestHealthAuth, 
+  checkHealthAuth, 
+  getDailyStepsData 
+} from '../services/nativeHealth';
 
 const Settings = ({ user, onLogout, triggerReloadUser }) => {
   // Office settings
@@ -20,6 +26,19 @@ const Settings = ({ user, onLogout, triggerReloadUser }) => {
   // Exporter controls
   const [exportLoading, setExportLoading] = useState(false);
   const [exportError, setExportError] = useState('');
+
+  // Native sync controls
+  const [nativeSyncLoading, setNativeSyncLoading] = useState(false);
+  const [nativeSyncStatus, setNativeSyncStatus] = useState('');
+  const [hasNativeAuth, setHasNativeAuth] = useState(false);
+
+  useEffect(() => {
+    if (isNativeApp()) {
+      checkHealthAuth().then(auth => {
+        setHasNativeAuth(auth);
+      });
+    }
+  }, []);
 
   const token = localStorage.getItem('lifetrack_token');
   const todayStr = new Date().toISOString().split('T')[0];
@@ -324,6 +343,76 @@ const Settings = ({ user, onLogout, triggerReloadUser }) => {
       setExportError(err.message || 'An error occurred exporting data.');
     } finally {
       setExportLoading(false);
+    }
+  };
+
+  const handleNativeConnect = async () => {
+    try {
+      setNativeSyncLoading(true);
+      setNativeSyncStatus('Requesting permissions...');
+      await requestHealthAuth();
+      const auth = await checkHealthAuth();
+      setHasNativeAuth(auth);
+      if (auth) {
+        setNativeSyncStatus('Connected to Health sensors successfully!');
+      } else {
+        setNativeSyncStatus('Health access authorization denied.');
+      }
+    } catch (err) {
+      setNativeSyncStatus(`Connection failed: ${err.message}`);
+    } finally {
+      setNativeSyncLoading(false);
+      setTimeout(() => setNativeSyncStatus(''), 5000);
+    }
+  };
+
+  const handleNativeSync = async () => {
+    try {
+      setNativeSyncLoading(true);
+      setNativeSyncStatus('Reading native steps logs...');
+      const samples = await getDailyStepsData(7);
+      
+      if (!samples || samples.length === 0) {
+        setNativeSyncStatus('No steps data found in native health vault.');
+        return;
+      }
+
+      setNativeSyncStatus(`Uploading ${samples.length} days of activity logs...`);
+      let syncCount = 0;
+
+      for (const sample of samples) {
+        const dateObj = new Date(sample.startDate);
+        const cleanDate = dateObj.toISOString().split('T')[0];
+        const stepsVal = Math.round(sample.value || 0);
+
+        if (stepsVal > 0) {
+          const distance = stepsVal * 0.00075;
+          const duration = stepsVal * 0.008;
+
+          await fetch('/api/activity/update', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${token}`
+            },
+            body: JSON.stringify({
+              date: cleanDate,
+              steps: stepsVal,
+              walkingDistance: parseFloat(distance.toFixed(2)),
+              walkingDuration: Math.round(duration)
+            })
+          });
+          syncCount++;
+        }
+      }
+
+      setNativeSyncStatus(`Successfully synchronized steps for ${syncCount} days!`);
+      triggerReloadUser();
+    } catch (err) {
+      setNativeSyncStatus(`Sync error: ${err.message}`);
+    } finally {
+      setNativeSyncLoading(false);
+      setTimeout(() => setNativeSyncStatus(''), 6000);
     }
   };
 
@@ -638,6 +727,59 @@ const Settings = ({ user, onLogout, triggerReloadUser }) => {
           </div>
         </div>
       </div>
+
+      {/* 2.6 Native Mobile Health Sync */}
+      {isNativeApp() ? (
+        <div className="card" style={{ borderLeft: '4px solid #34c759' }}>
+          <h3 style={{ fontSize: '1.1rem', fontWeight: 700, marginBottom: '0.5rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+            <Award size={20} style={{ color: '#34c759' }} />
+            Native iOS HealthKit / Android Health Connect Sync
+          </h3>
+          <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginBottom: '1.25rem' }}>
+            Synchronize your steps history directly from Apple Health (iOS) or Health Connect (Android) using the native device health API.
+          </p>
+
+          {nativeSyncStatus && (
+            <div style={{ padding: '0.75rem', backgroundColor: 'var(--bg-tertiary)', border: '1px solid var(--border)', borderRadius: 'var(--radius-md)', marginBottom: '1rem', fontSize: '0.85rem', color: 'var(--text-primary)' }}>
+              {nativeSyncStatus}
+            </div>
+          )}
+
+          <div style={{ display: 'flex', gap: '1rem' }}>
+            <button 
+              onClick={handleNativeConnect} 
+              className="btn btn-secondary" 
+              style={{ flex: 1, display: 'flex', gap: '0.4rem', justifyContent: 'center', alignItems: 'center' }}
+              disabled={nativeSyncLoading}
+            >
+              <span>🔗</span>
+              <span>{hasNativeAuth ? 'Re-authorize Access' : 'Authorize Health App'}</span>
+            </button>
+            <button 
+              onClick={handleNativeSync} 
+              className="btn btn-primary" 
+              style={{ flex: 1, display: 'flex', gap: '0.4rem', justifyContent: 'center', alignItems: 'center', backgroundColor: '#34c759', borderColor: '#34c759' }}
+              disabled={nativeSyncLoading || !hasNativeAuth}
+            >
+              <span>🔄</span>
+              <span>Sync Last 7 Days</span>
+            </button>
+          </div>
+        </div>
+      ) : (
+        <div className="card">
+          <h3 style={{ fontSize: '1.1rem', fontWeight: 700, marginBottom: '0.5rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+            <Award size={20} style={{ color: 'var(--text-muted)' }} />
+            Native Mobile Health Sync
+          </h3>
+          <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginBottom: '0.75rem' }}>
+            Direct background steps syncing via Apple HealthKit and Google Health Connect is available when running the application inside the mobile app wrapper.
+          </p>
+          <span style={{ fontSize: '0.75rem', color: 'var(--primary)', fontWeight: 600 }}>
+            💡 Run this web app in iOS/Android simulator or native build to enable.
+          </span>
+        </div>
+      )}
 
       {/* 2.75 Excel/CSV Exporter */}
       <div className="card">
