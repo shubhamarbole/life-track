@@ -77,13 +77,14 @@ Your tasks:
    - CHECK_OUT: { time: String (optional, format HH:MM, defaults to now), date: String (optional, YYYY-MM-DD, defaults to today: ${todayStr}) }
    - START_WORK: { category: 'Coding' | 'Learning' | 'Meeting' | 'Other' (required) }
    - STOP_WORK: {}
+   - UPDATE_WORK_SUMMARY: { summary: String (required), date: String (optional, YYYY-MM-DD, defaults to today: ${todayStr}) }
 
 4. Response Format:
    You MUST return a JSON object conforming exactly to this schema:
    {
      "reply": "Your conversational response in markdown formatting. If you are triggerring an action, explicitly confirm what action you have prepared.",
      "action": null | {
-       "type": "CREATE_EXPENSE" | "UPDATE_STEPS" | "CHECK_IN" | "CHECK_OUT" | "START_WORK" | "STOP_WORK",
+       "type": "CREATE_EXPENSE" | "UPDATE_STEPS" | "CHECK_IN" | "CHECK_OUT" | "START_WORK" | "STOP_WORK" | "UPDATE_WORK_SUMMARY",
        "payload": object
      }
    }
@@ -137,10 +138,19 @@ Your tasks:
       // 1. Try to parse steps command, e.g. "update steps to 9000 yesterday"
       const stepsMatch = lowerMsg.match(/(?:steps|walked|log\s+steps)\s+(?:to\s+)?(\d+)/i) || lowerMsg.match(/(\d+)\s+steps/i);
 
-      // 2. Try to parse basic expense command, e.g. "spent 500 on Food yesterday"
-      const expenseMatch = lowerMsg.match(/(?:spent|log|cost|expense)\s+(?:₹|rs\.?|\$)?(\d+(?:\.\d+)?)\s+(?:on|for)\s+(\w+)(?:\s+for\s+(.*))?/i);
+      // 3. Try to parse work done/work summary command, e.g. "work done: completed database setup yesterday"
+      const workDoneMatch = lowerMsg.match(/(?:work\s+done|work\s+summary|log\s+work)\s*(?::|to)\s*(.*)/i);
 
-      if (stepsMatch) {
+      if (workDoneMatch) {
+        const summaryText = workDoneMatch[1].trim();
+        let cleanSummary = summaryText.replace(/\byesterday\b/gi, '').trim();
+        aiResponse.action = {
+          type: 'UPDATE_WORK_SUMMARY',
+          payload: { summary: cleanSummary, date: targetDate }
+        };
+        aiResponse.reply = `Rule Agent: Logging work done note **"${cleanSummary}"** for **${targetDate === todayStr ? 'today' : 'yesterday'}** (${targetDate}).`;
+      }
+      else if (stepsMatch) {
         const steps = parseInt(stepsMatch[1]);
         aiResponse.action = {
           type: 'UPDATE_STEPS',
@@ -316,6 +326,25 @@ Your tasks:
           } else {
             actionDetails = `No active work session to stop.`;
           }
+        }
+        else if (type === 'UPDATE_WORK_SUMMARY') {
+          const { summary, date } = payload;
+          const targetDate = date || todayStr;
+          
+          let att = await OfficeAttendance.findOne({ userId, date: targetDate });
+          if (!att) {
+            att = new OfficeAttendance({
+              userId,
+              date: targetDate,
+              arrivalTime: new Date(),
+              workSummary: summary || ''
+            });
+          } else {
+            att.workSummary = summary || '';
+          }
+          await att.save();
+          actionExecuted = true;
+          actionDetails = `Updated work summary note to "${summary}" for ${targetDate === todayStr ? 'today' : 'yesterday'} (${targetDate})`;
         }
 
         // Record agent action log
