@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { 
   Bot, Send, RefreshCw, AlertCircle, Calendar, 
-  Wallet, Clock, Footprints, MessageSquare, Check, Sparkles
+  Wallet, Clock, Footprints, MessageSquare, Check, Sparkles,
+  Mic, MicOff
 } from 'lucide-react';
 
 const AiAssistant = () => {
@@ -19,6 +20,48 @@ const AiAssistant = () => {
   const [inputText, setInputText] = useState('');
   const [loading, setLoading] = useState(false);
   const messagesEndRef = useRef(null);
+
+  // Voice recognition states
+  const [isListening, setIsListening] = useState(false);
+  const recognitionRef = useRef(null);
+
+  useEffect(() => {
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (SpeechRecognition) {
+      const rec = new SpeechRecognition();
+      rec.continuous = false;
+      rec.interimResults = false;
+      rec.lang = 'en-US';
+
+      rec.onstart = () => {
+        setIsListening(true);
+      };
+
+      rec.onend = () => {
+        setIsListening(false);
+      };
+
+      rec.onresult = (event) => {
+        const transcript = event.results[0][0].transcript;
+        setInputText(prev => prev + (prev ? ' ' : '') + transcript);
+      };
+
+      recognitionRef.current = rec;
+    }
+  }, []);
+
+  const toggleListening = () => {
+    if (!recognitionRef.current) {
+      alert("Voice recognition is not supported in this browser. Please try Google Chrome or Safari!");
+      return;
+    }
+
+    if (isListening) {
+      recognitionRef.current.stop();
+    } else {
+      recognitionRef.current.start();
+    }
+  };
 
   const token = localStorage.getItem('lifetrack_token');
   const clientDate = new Date().toISOString().split('T')[0];
@@ -338,6 +381,32 @@ const AiAssistant = () => {
           }}
           disabled={loading}
         />
+        <button
+          type="button"
+          onClick={toggleListening}
+          style={{
+            width: '2.75rem',
+            height: '2.75rem',
+            borderRadius: '50%',
+            padding: 0,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            flexShrink: 0,
+            backgroundColor: isListening ? '#ff3b30' : 'var(--bg-secondary)',
+            border: isListening ? 'none' : '1px solid var(--border)',
+            boxShadow: isListening ? '0 0 12px #ff3b30' : 'none',
+            transition: 'all 0.3s ease',
+            cursor: 'pointer'
+          }}
+          title={isListening ? 'Listening... Tap to stop' : 'Tap to speak'}
+        >
+          {isListening ? (
+            <MicOff size={16} style={{ color: '#fff' }} />
+          ) : (
+            <Mic size={16} style={{ color: 'var(--text-secondary)' }} />
+          )}
+        </button>
         <button
           type="submit"
           disabled={!inputText.trim() || loading}
