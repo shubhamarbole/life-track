@@ -125,32 +125,58 @@ Your tasks:
       };
 
       const lowerMsg = message.toLowerCase();
-      // Try to parse basic expense command, e.g. "spent 500 on Food"
+
+      // Determine date (default today, check if yesterday is specified)
+      let targetDate = todayStr;
+      if (lowerMsg.includes('yesterday')) {
+        const yesterdayDate = new Date();
+        yesterdayDate.setDate(yesterdayDate.getDate() - 1);
+        targetDate = yesterdayDate.toISOString().split('T')[0];
+      }
+
+      // 1. Try to parse steps command, e.g. "update steps to 9000 yesterday"
+      const stepsMatch = lowerMsg.match(/(?:steps|walked|log\s+steps)\s+(?:to\s+)?(\d+)/i) || lowerMsg.match(/(\d+)\s+steps/i);
+
+      // 2. Try to parse basic expense command, e.g. "spent 500 on Food yesterday"
       const expenseMatch = lowerMsg.match(/(?:spent|log|cost|expense)\s+(?:₹|rs\.?|\$)?(\d+(?:\.\d+)?)\s+(?:on|for)\s+(\w+)(?:\s+for\s+(.*))?/i);
-      if (expenseMatch) {
+
+      if (stepsMatch) {
+        const steps = parseInt(stepsMatch[1]);
+        aiResponse.action = {
+          type: 'UPDATE_STEPS',
+          payload: { steps, date: targetDate }
+        };
+        aiResponse.reply = `Rule Agent: Recording **${steps.toLocaleString()} steps** for **${targetDate === todayStr ? 'today' : 'yesterday'}** (${targetDate}).`;
+      }
+      else if (expenseMatch) {
         const amount = parseFloat(expenseMatch[1]);
         let category = expenseMatch[2].charAt(0).toUpperCase() + expenseMatch[2].slice(1).toLowerCase();
         if (!['Food', 'Travel', 'Shopping', 'Bills', 'Other'].includes(category)) {
           category = 'Other';
         }
         const note = expenseMatch[3] || '';
+        let cleanNote = note.replace(/\byesterday\b/gi, '').trim();
         aiResponse.action = {
           type: 'CREATE_EXPENSE',
-          payload: { amount, category, note, date: todayStr }
+          payload: { amount, category, note: cleanNote, date: targetDate }
         };
-        aiResponse.reply = `Rule Agent: I detected you want to record an expense of **₹${amount}** under **${category}**. Executing transaction...`;
+        aiResponse.reply = `Rule Agent: Recording expense of **₹${amount}** for **${category}** logged for **${targetDate === todayStr ? 'today' : 'yesterday'}** (${targetDate}).`;
       } 
-      // Parse check-in, e.g. "check in", "reached office"
+      // Parse check-in, e.g. "check in yesterday at 9:30"
       else if (lowerMsg.includes('check in') || lowerMsg.includes('arrive') || lowerMsg.includes('reached office')) {
-        aiResponse.action = { type: 'CHECK_IN', payload: { date: todayStr } };
-        aiResponse.reply = `Rule Agent: Logging office **Check-in** for today.`;
+        const timeMatch = lowerMsg.match(/(?:at|time)\s+(\d{1,2}):(\d{2})/);
+        const timePayload = timeMatch ? `${timeMatch[1].padStart(2, '0')}:${timeMatch[2]}` : null;
+        aiResponse.action = { type: 'CHECK_IN', payload: { date: targetDate, time: timePayload } };
+        aiResponse.reply = `Rule Agent: Logging office **Check-in** for **${targetDate === todayStr ? 'today' : 'yesterday'}** (${targetDate})${timePayload ? ` at ${timePayload}` : ''}.`;
       }
-      // Parse check-out, e.g. "check out", "leaving office"
+      // Parse check-out, e.g. "check out yesterday at 18:30"
       else if (lowerMsg.includes('check out') || lowerMsg.includes('leave office') || lowerMsg.includes('departed')) {
-        aiResponse.action = { type: 'CHECK_OUT', payload: { date: todayStr } };
-        aiResponse.reply = `Rule Agent: Logging office **Check-out** for today.`;
+        const timeMatch = lowerMsg.match(/(?:at|time)\s+(\d{1,2}):(\d{2})/);
+        const timePayload = timeMatch ? `${timeMatch[1].padStart(2, '0')}:${timeMatch[2]}` : null;
+        aiResponse.action = { type: 'CHECK_OUT', payload: { date: targetDate, time: timePayload } };
+        aiResponse.reply = `Rule Agent: Logging office **Check-out** for **${targetDate === todayStr ? 'today' : 'yesterday'}** (${targetDate})${timePayload ? ` at ${timePayload}` : ''}.`;
       }
-      // Parse start work, e.g. "start coding", "start learning"
+      // Parse start work, e.g. "start coding"
       else if (lowerMsg.includes('start coding') || lowerMsg.includes('start work coding')) {
         aiResponse.action = { type: 'START_WORK', payload: { category: 'Coding' } };
         aiResponse.reply = `Rule Agent: Starting a **Coding** work session timer.`;
@@ -161,7 +187,7 @@ Your tasks:
         aiResponse.action = { type: 'START_WORK', payload: { category: 'Meeting' } };
         aiResponse.reply = `Rule Agent: Starting a **Meeting** work session timer.`;
       }
-      // Parse stop work, e.g. "stop coding", "stop work", "stop session"
+      // Parse stop work
       else if (lowerMsg.includes('stop work') || lowerMsg.includes('stop session') || lowerMsg.includes('end session')) {
         aiResponse.action = { type: 'STOP_WORK', payload: {} };
         aiResponse.reply = `Rule Agent: Stopping active work session timer.`;
