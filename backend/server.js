@@ -20,6 +20,8 @@ const __dirname = path.dirname(__filename);
 
 dotenv.config({ path: path.join(__dirname, '.env') });
 
+console.log("Loaded GEMINI_API_KEY:", process.env.GEMINI_API_KEY ? `Yes (${process.env.GEMINI_API_KEY.substring(0, 5)}...)` : 'No');
+
 // Connect to Database
 connectDB();
 
