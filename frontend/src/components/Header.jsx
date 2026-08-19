@@ -11,7 +11,7 @@ const Header = ({ theme, user, onLogout }) => {
         <div className="navbar-diamond-logo">
           <div className="diamond-inner"></div>
         </div>
-        <span className="navbar-brand-text">DAY TRACKER</span>
+        <span className="navbar-brand-text">DAYTRACK</span>
       </div>
 
       {/* Navigation Pills (Desktop only inside navbar capsule) */}
@@ -23,12 +23,18 @@ const Header = ({ theme, user, onLogout }) => {
           Dashboard
         </NavLink>
         <NavLink 
+          to="/assistant" 
+          className={({ isActive }) => `navbar-pill-link ${isActive ? 'active' : ''}`}
+        >
+          AI Assistant
+        </NavLink>
+        <NavLink 
           to="/history" 
           className={({ isActive }) => `navbar-pill-link ${isActive ? 'active' : ''}`}
         >
           History
         </NavLink>
-
+ 
         <NavLink 
           to="/money" 
           className={({ isActive }) => `navbar-pill-link ${isActive ? 'active' : ''}`}

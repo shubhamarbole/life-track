@@ -1,6 +1,6 @@
 import React from 'react';
 import { NavLink } from 'react-router-dom';
-import { Home, Calendar, BarChart2, DollarSign, Settings } from 'lucide-react';
+import { Home, Bot, Calendar, DollarSign, Settings } from 'lucide-react';
 
 const BottomNav = () => {
   return (
@@ -10,7 +10,14 @@ const BottomNav = () => {
         className={({ isActive }) => `bottom-nav-item ${isActive ? 'active' : ''}`}
       >
         <Home />
-        <span>Home</span>
+        <span>Dashboard</span>
+      </NavLink>
+      <NavLink 
+        to="/assistant" 
+        className={({ isActive }) => `bottom-nav-item ${isActive ? 'active' : ''}`}
+      >
+        <Bot />
+        <span>Assistant</span>
       </NavLink>
       <NavLink 
         to="/history" 
@@ -19,7 +26,6 @@ const BottomNav = () => {
         <Calendar />
         <span>History</span>
       </NavLink>
-
       <NavLink 
         to="/money" 
         className={({ isActive }) => `bottom-nav-item ${isActive ? 'active' : ''}`}

@@ -15,7 +15,9 @@ import {
   Play,
   Square,
   Filter,
-  ChevronDown
+  ChevronDown,
+  Sparkles,
+  RefreshCw
 } from 'lucide-react';
 import SpendingModal from '../components/SpendingModal';
 
@@ -35,6 +37,10 @@ const Dashboard = ({ user, triggerReloadUser }) => {
   const [workSummaryText, setWorkSummaryText] = useState('');
   const [savingSummary, setSavingSummary] = useState(false);
 
+  // AI summary states
+  const [aiSummary, setAiSummary] = useState(null);
+  const [loadingAiSummary, setLoadingAiSummary] = useState(false);
+
   useEffect(() => {
     if (attendance) {
       setWorkSummaryText(attendance.workSummary || '');
@@ -45,6 +51,23 @@ const Dashboard = ({ user, triggerReloadUser }) => {
 
   const token = localStorage.getItem('lifetrack_token');
   const todayStr = new Date().toISOString().split('T')[0];
+
+  const fetchAiSummary = async () => {
+    try {
+      setLoadingAiSummary(true);
+      const res = await fetch(`/api/agent/summary?date=${todayStr}`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setAiSummary(data);
+      }
+    } catch (err) {
+      console.error('Error fetching AI summary:', err);
+    } finally {
+      setLoadingAiSummary(false);
+    }
+  };
 
   // Fetch all dashboard data
   const fetchData = async () => {
@@ -98,6 +121,9 @@ const Dashboard = ({ user, triggerReloadUser }) => {
         const spData = await spendingRes.json();
         setSpending(spData);
       }
+
+      // Fetch AI summary
+      await fetchAiSummary();
 
     } catch (err) {
       console.error('Error fetching dashboard data:', err);
@@ -560,6 +586,60 @@ const Dashboard = ({ user, triggerReloadUser }) => {
           {/* Left Column: Rings + Highlights + Geofence */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
             
+            {/* AI Companion Widget Card */}
+            <div className="glass-card-raised" style={{ borderLeft: '3px solid #0a84ff', display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <h3 style={{ fontSize: '1.05rem', fontWeight: 700, margin: 0, display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                  <Sparkles size={16} style={{ color: '#0a84ff' }} />
+                  AI Daily Insights
+                </h3>
+                <button 
+                  onClick={fetchAiSummary} 
+                  disabled={loadingAiSummary}
+                  style={{
+                    background: 'none', border: 'none', color: '#0a84ff', 
+                    fontSize: '0.75rem', fontWeight: 600, cursor: 'pointer',
+                    display: 'flex', alignItems: 'center', gap: '0.2rem'
+                  }}
+                >
+                  <RefreshCw size={12} className={loadingAiSummary ? 'anim-pulse' : ''} />
+                  Refresh
+                </button>
+              </div>
+
+              {loadingAiSummary ? (
+                <p style={{ color: '#8e8e93', fontSize: '0.8rem', fontStyle: 'italic', margin: 0 }}>Analyzing daily metrics...</p>
+              ) : aiSummary ? (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.65rem' }}>
+                  <p style={{ fontSize: '0.85rem', color: '#ffffff', margin: 0, lineHeight: '1.4' }}>
+                    {aiSummary.summary}
+                  </p>
+                  {aiSummary.insights && aiSummary.insights.length > 0 && (
+                    <ul style={{ paddingLeft: '1.1rem', margin: 0, display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
+                      {aiSummary.insights.map((insight, idx) => (
+                        <li key={idx} style={{ fontSize: '0.75rem', color: '#8e8e93', listStyleType: 'disc' }}>
+                          {insight}
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                  <p style={{ fontSize: '0.8rem', color: '#8e8e93', margin: 0 }}>
+                    Let the AI Coach review your day's expenses, steps, and work sessions.
+                  </p>
+                  <button 
+                    onClick={fetchAiSummary} 
+                    className="btn btn-secondary" 
+                    style={{ alignSelf: 'flex-start', padding: '0.35rem 0.75rem', fontSize: '0.75rem', borderRadius: '8px' }}
+                  >
+                    Generate Insights
+                  </button>
+                </div>
+              )}
+            </div>
+
             {/* Rings Widget Card */}
             <div className="glass-card-raised">
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>

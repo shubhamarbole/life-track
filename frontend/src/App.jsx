@@ -5,6 +5,7 @@ import Header from './components/Header';
 
 // Pages
 import Dashboard from './pages/Dashboard';
+import AiAssistant from './pages/AiAssistant';
 import History from './pages/History';
 import Money from './pages/Money';
 import Settings from './pages/Settings';
@@ -80,6 +81,7 @@ function App() {
             <main className="main-content-streamline">
               <Routes>
                 <Route path="/" element={<Dashboard user={user} triggerReloadUser={fetchUserProfile} />} />
+                <Route path="/assistant" element={<AiAssistant />} />
                 <Route path="/history" element={<History />} />
                 <Route path="/money" element={<Money />} />
                 <Route path="/settings" element={<Settings user={user} onLogout={handleLogout} triggerReloadUser={fetchUserProfile} />} />

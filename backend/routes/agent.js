@@ -1,0 +1,393 @@
+import express from 'express';
+import Expense from '../models/Expense.js';
+import DailyActivity from '../models/DailyActivity.js';
+import OfficeAttendance from '../models/OfficeAttendance.js';
+import WorkSession from '../models/WorkSession.js';
+import AgentActivity from '../models/AgentActivity.js';
+import { protect } from '../middleware/auth.js';
+
+const router = express.Router();
+
+// Helper to get start date for history (30 days ago)
+const getStartDate30DaysAgo = () => {
+  const date = new Date();
+  date.setDate(date.getDate() - 30);
+  return date.toISOString().split('T')[0];
+};
+
+// Helper to format duration in hours/minutes
+const formatDuration = (ms) => {
+  if (!ms) return '0m';
+  const mins = Math.round(ms / 60000);
+  if (mins < 60) return `${mins}m`;
+  const hrs = Math.floor(mins / 60);
+  const remMins = mins % 60;
+  return remMins > 0 ? `${hrs}h ${remMins}m` : `${hrs}h`;
+};
+
+// @desc    Process chat message with AI Agent
+// @route   POST /api/agent/chat
+// @access  Private
+router.post('/chat', protect, async (req, res) => {
+  const { message, clientDate } = req.body;
+  const userId = req.user._id;
+
+  if (!message) {
+    return res.status(400).json({ message: 'Message is required' });
+  }
+
+  const todayStr = clientDate || new Date().toISOString().split('T')[0];
+  const startDate = getStartDate30DaysAgo();
+
+  try {
+    // 1. Fetch user data context (last 30 days)
+    const [expenses, activities, attendance, workSessions] = await Promise.all([
+      Expense.find({ userId, date: { $gte: startDate } }).sort({ date: -1 }),
+      DailyActivity.find({ userId, date: { $gte: startDate } }).sort({ date: -1 }),
+      OfficeAttendance.find({ userId, date: { $gte: startDate } }).sort({ date: -1 }),
+      WorkSession.find({ userId, date: { $gte: startDate } }).sort({ date: -1 })
+    ]);
+
+    const geminiKey = process.env.GEMINI_API_KEY;
+    let aiResponse = null;
+
+    if (geminiKey) {
+      try {
+        const clientTime = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+        const systemPrompt = `You are 'DayTrack AI', a helpful, personal daily tracking companion.
+You analyze the user's daily habits, expenses, office hours, work productivity, and movement step count to provide coaching, answer questions, and perform actions.
+
+Context about the user:
+Current Date: ${todayStr}
+Current Time: ${clientTime}
+
+User Tracking History (Last 30 Days):
+- Expenses: ${JSON.stringify(expenses.map(e => ({ amount: e.amount, category: e.category, note: e.note, date: e.date })))}
+- Daily Movement & Steps: ${JSON.stringify(activities.map(a => ({ steps: a.steps, distance: a.walkingDistance, date: a.date })))}
+- Office Attendance Logs: ${JSON.stringify(attendance.map(att => ({ arrival: att.arrivalTime, departure: att.departureTime, duration: att.officeDuration, date: att.date })))}
+- Work Productivity Sessions: ${JSON.stringify(workSessions.map(w => ({ category: w.category, duration: w.duration, startTime: w.startTime, endTime: w.endTime, date: w.date })))}
+
+Your tasks:
+1. Provide concise, encouraging, and friendly answers to the user's questions about their logs, history, productivity, or spendings.
+2. If the user requests to record, start, stop, check-in, check-out, or modify any tracking data, you MUST return a structured action object in your JSON response. Do NOT perform any database writes yourself, just supply the action request.
+3. Available Actions:
+   - CREATE_EXPENSE: { amount: Number (required), category: 'Food' | 'Travel' | 'Shopping' | 'Bills' | 'Other' (required), note: String (optional), date: String (optional, format YYYY-MM-DD, defaults to today: ${todayStr}) }
+   - UPDATE_STEPS: { steps: Number (required), date: String (optional, YYYY-MM-DD, defaults to today: ${todayStr}) }
+   - CHECK_IN: { time: String (optional, format HH:MM, defaults to now), date: String (optional, YYYY-MM-DD, defaults to today: ${todayStr}) }
+   - CHECK_OUT: { time: String (optional, format HH:MM, defaults to now), date: String (optional, YYYY-MM-DD, defaults to today: ${todayStr}) }
+   - START_WORK: { category: 'Coding' | 'Learning' | 'Meeting' | 'Other' (required) }
+   - STOP_WORK: {}
+
+4. Response Format:
+   You MUST return a JSON object conforming exactly to this schema:
+   {
+     "reply": "Your conversational response in markdown formatting. If you are triggerring an action, explicitly confirm what action you have prepared.",
+     "action": null | {
+       "type": "CREATE_EXPENSE" | "UPDATE_STEPS" | "CHECK_IN" | "CHECK_OUT" | "START_WORK" | "STOP_WORK",
+       "payload": object
+     }
+   }
+`;
+
+        const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${geminiKey}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            contents: [
+              { parts: [{ text: `User message: ${message}` }] }
+            ],
+            systemInstruction: {
+              parts: [{ text: systemPrompt }]
+            },
+            generationConfig: {
+              responseMimeType: 'application/json'
+            }
+          })
+        });
+
+        const geminiData = await response.json();
+        if (response.ok) {
+          const rawText = geminiData.candidates?.[0]?.content?.parts?.[0]?.text;
+          aiResponse = JSON.parse(rawText);
+        } else {
+          console.error('Gemini API Error:', geminiData);
+        }
+      } catch (geminiErr) {
+        console.error('Gemini sync call error:', geminiErr);
+      }
+    }
+
+    // 2. Rule-based Fallback Parser (if Gemini key is missing or call failed)
+    if (!aiResponse) {
+      aiResponse = {
+        reply: "I am running in local offline mode. To enable smart AI responses, please configure `GEMINI_API_KEY` in the `backend/.env` file. However, I can still parse basic command patterns!",
+        action: null
+      };
+
+      const lowerMsg = message.toLowerCase();
+      // Try to parse basic expense command, e.g. "spent 500 on Food"
+      const expenseMatch = lowerMsg.match(/(?:spent|log|cost|expense)\s+(?:₹|rs\.?|\$)?(\d+(?:\.\d+)?)\s+(?:on|for)\s+(\w+)(?:\s+for\s+(.*))?/i);
+      if (expenseMatch) {
+        const amount = parseFloat(expenseMatch[1]);
+        let category = expenseMatch[2].charAt(0).toUpperCase() + expenseMatch[2].slice(1).toLowerCase();
+        if (!['Food', 'Travel', 'Shopping', 'Bills', 'Other'].includes(category)) {
+          category = 'Other';
+        }
+        const note = expenseMatch[3] || '';
+        aiResponse.action = {
+          type: 'CREATE_EXPENSE',
+          payload: { amount, category, note, date: todayStr }
+        };
+        aiResponse.reply = `Rule Agent: I detected you want to record an expense of **₹${amount}** under **${category}**. Executing transaction...`;
+      } 
+      // Parse check-in, e.g. "check in", "reached office"
+      else if (lowerMsg.includes('check in') || lowerMsg.includes('arrive') || lowerMsg.includes('reached office')) {
+        aiResponse.action = { type: 'CHECK_IN', payload: { date: todayStr } };
+        aiResponse.reply = `Rule Agent: Logging office **Check-in** for today.`;
+      }
+      // Parse check-out, e.g. "check out", "leaving office"
+      else if (lowerMsg.includes('check out') || lowerMsg.includes('leave office') || lowerMsg.includes('departed')) {
+        aiResponse.action = { type: 'CHECK_OUT', payload: { date: todayStr } };
+        aiResponse.reply = `Rule Agent: Logging office **Check-out** for today.`;
+      }
+      // Parse start work, e.g. "start coding", "start learning"
+      else if (lowerMsg.includes('start coding') || lowerMsg.includes('start work coding')) {
+        aiResponse.action = { type: 'START_WORK', payload: { category: 'Coding' } };
+        aiResponse.reply = `Rule Agent: Starting a **Coding** work session timer.`;
+      } else if (lowerMsg.includes('start learning')) {
+        aiResponse.action = { type: 'START_WORK', payload: { category: 'Learning' } };
+        aiResponse.reply = `Rule Agent: Starting a **Learning** work session timer.`;
+      } else if (lowerMsg.includes('start meeting')) {
+        aiResponse.action = { type: 'START_WORK', payload: { category: 'Meeting' } };
+        aiResponse.reply = `Rule Agent: Starting a **Meeting** work session timer.`;
+      }
+      // Parse stop work, e.g. "stop coding", "stop work", "stop session"
+      else if (lowerMsg.includes('stop work') || lowerMsg.includes('stop session') || lowerMsg.includes('end session')) {
+        aiResponse.action = { type: 'STOP_WORK', payload: {} };
+        aiResponse.reply = `Rule Agent: Stopping active work session timer.`;
+      }
+      // Parse summary query
+      else if (lowerMsg.includes('summary') || lowerMsg.includes('how was my day')) {
+        aiResponse.reply = `Rule Agent: Here is a quick summary of your day so far:\n- Work logged today: ${formatDuration(workSessions.filter(s => s.date === todayStr).reduce((acc, curr) => acc + (curr.duration || 0), 0))}\n- Steps walked: ${activities.find(a => a.date === todayStr)?.steps || 0}\n- Money spent today: ₹${expenses.filter(e => e.date === todayStr).reduce((acc, curr) => acc + curr.amount, 0)}`;
+      }
+    }
+
+    // 3. Execute Action in Database if present
+    let actionExecuted = false;
+    let actionDetails = '';
+
+    if (aiResponse.action) {
+      const { type, payload } = aiResponse.action;
+
+      try {
+        if (type === 'CREATE_EXPENSE') {
+          const { amount, category, note, date } = payload;
+          await Expense.create({
+            userId,
+            amount: parseFloat(amount),
+            category: category || 'Other',
+            note: note || '',
+            date: date || todayStr
+          });
+          actionExecuted = true;
+          actionDetails = `Logged expense of ₹${amount} for ${category}`;
+        }
+        else if (type === 'UPDATE_STEPS') {
+          const { steps, date } = payload;
+          const targetDate = date || todayStr;
+          const distance = steps * 0.00075;
+          const duration = steps * 0.008;
+
+          let activity = await DailyActivity.findOne({ userId, date: targetDate });
+          if (!activity) {
+            activity = new DailyActivity({
+              userId,
+              date: targetDate,
+              steps,
+              walkingDistance: parseFloat(distance.toFixed(2)),
+              walkingDuration: Math.round(duration)
+            });
+          } else {
+            activity.steps = steps;
+            activity.walkingDistance = parseFloat(distance.toFixed(2));
+            activity.walkingDuration = Math.round(duration);
+          }
+          await activity.save();
+          actionExecuted = true;
+          actionDetails = `Updated step count to ${steps.toLocaleString()} steps`;
+        }
+        else if (type === 'CHECK_IN') {
+          const targetDate = payload.date || todayStr;
+          const checkInTime = payload.time ? new Date(`${targetDate}T${payload.time}`) : new Date();
+
+          let att = await OfficeAttendance.findOne({ userId, date: targetDate });
+          if (!att) {
+            att = new OfficeAttendance({
+              userId,
+              date: targetDate,
+              arrivalTime: checkInTime
+            });
+            await att.save();
+            actionExecuted = true;
+            actionDetails = `Logged office arrival at ${checkInTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
+          } else {
+            actionDetails = `Already checked in today at ${new Date(att.arrivalTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
+          }
+        }
+        else if (type === 'CHECK_OUT') {
+          const targetDate = payload.date || todayStr;
+          const checkOutTime = payload.time ? new Date(`${targetDate}T${payload.time}`) : new Date();
+
+          let att = await OfficeAttendance.findOne({ userId, date: targetDate });
+          if (att) {
+            att.departureTime = checkOutTime;
+            att.officeDuration = checkOutTime.getTime() - new Date(att.arrivalTime).getTime();
+            await att.save();
+            actionExecuted = true;
+            actionDetails = `Logged office departure at ${checkOutTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
+          } else {
+            actionDetails = `Cannot check out. No active office check-in found for ${targetDate}.`;
+          }
+        }
+        else if (type === 'START_WORK') {
+          const { category } = payload;
+          // Stop any active session first
+          const active = await WorkSession.findOne({ userId, endTime: null });
+          if (active) {
+            active.endTime = new Date();
+            active.duration = active.endTime.getTime() - new Date(active.startTime).getTime();
+            await active.save();
+          }
+
+          await WorkSession.create({
+            userId,
+            date: todayStr,
+            startTime: new Date(),
+            category: category || 'Other'
+          });
+          actionExecuted = true;
+          actionDetails = `Started work session for: ${category}`;
+        }
+        else if (type === 'STOP_WORK') {
+          const active = await WorkSession.findOne({ userId, endTime: null });
+          if (active) {
+            active.endTime = new Date();
+            active.duration = active.endTime.getTime() - new Date(active.startTime).getTime();
+            await active.save();
+            actionExecuted = true;
+            actionDetails = `Stopped work session for: ${active.category} (${formatDuration(active.duration)})`;
+          } else {
+            actionDetails = `No active work session to stop.`;
+          }
+        }
+
+        // Record agent action log
+        if (actionExecuted) {
+          await AgentActivity.create({
+            userId,
+            action: 'agent_action',
+            details: `Agent Action: ${actionDetails}`
+          });
+        }
+      } catch (dbErr) {
+        console.error('Database action error:', dbErr);
+        aiResponse.reply += `\n\n*(Error performing action: ${dbErr.message})*`;
+      }
+    }
+
+    res.json({
+      reply: aiResponse.reply,
+      action: aiResponse.action,
+      executed: actionExecuted,
+      actionDetails: actionDetails
+    });
+
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+});
+
+// @desc    Get AI Daily summary and coaching insights
+// @route   GET /api/agent/summary
+// @access  Private
+router.get('/summary', protect, async (req, res) => {
+  const { date } = req.query;
+  const userId = req.user._id;
+  const todayStr = date || new Date().toISOString().split('T')[0];
+
+  try {
+    // Fetch today's data specifically
+    const [expenses, activity, attendance, workSessions] = await Promise.all([
+      Expense.find({ userId, date: todayStr }),
+      DailyActivity.findOne({ userId, date: todayStr }),
+      OfficeAttendance.findOne({ userId, date: todayStr }),
+      WorkSession.find({ userId, date: todayStr })
+    ]);
+
+    const workDurationMs = workSessions.reduce((acc, curr) => acc + (curr.duration || 0), 0);
+    const spendingAmt = expenses.reduce((acc, curr) => acc + curr.amount, 0);
+    const stepsCount = activity?.steps || 0;
+
+    const geminiKey = process.env.GEMINI_API_KEY;
+    let summaryJson = null;
+
+    if (geminiKey) {
+      try {
+        const prompt = `You are a personal AI coach. Analyze the user's tracking metrics for today (${todayStr}) and summarize their day.
+Metrics:
+- Steps: ${stepsCount} (distance: ${activity?.walkingDistance || 0} km)
+- Office check-in: ${attendance?.arrivalTime ? new Date(attendance.arrivalTime).toLocaleTimeString([], {hour: '2-digit', minute: '2-digit'}) : 'None'}
+- Office check-out: ${attendance?.departureTime ? new Date(attendance.departureTime).toLocaleTimeString([], {hour: '2-digit', minute: '2-digit'}) : 'None'}
+- Office presence duration: ${attendance?.officeDuration ? (attendance.officeDuration / 3600000).toFixed(1) : 0} hours
+- Work timers: ${JSON.stringify(workSessions.map(w => ({ category: w.category, duration: w.duration })))}
+- Money spent: ₹${spendingAmt} (Expenses: ${JSON.stringify(expenses.map(e => ({ amount: e.amount, category: e.category, note: e.note })))})
+
+Write a brief (max 3 sentences) summary of their day's activities. Then suggest 2 short bullet points of coaching insights or wellness tips based on these numbers.
+Return a JSON object conforming exactly to this schema:
+{
+  "summary": "Your encouraging summary text here.",
+  "insights": ["Insight 1", "Insight 2"]
+}
+`;
+
+        const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${geminiKey}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            contents: [{ parts: [{ text: prompt }] }],
+            generationConfig: {
+              responseMimeType: 'application/json'
+            }
+          })
+        });
+
+        const geminiData = await response.json();
+        if (response.ok) {
+          const rawText = geminiData.candidates?.[0]?.content?.parts?.[0]?.text;
+          summaryJson = JSON.parse(rawText);
+        }
+      } catch (geminiErr) {
+        console.error('Gemini summary call error:', geminiErr);
+      }
+    }
+
+    if (!summaryJson) {
+      // Fallback response
+      const workHoursText = formatDuration(workDurationMs);
+      summaryJson = {
+        summary: `Today, you logged ${workHoursText} of work sessions, walked ${stepsCount.toLocaleString()} steps, and spent ₹${spendingAmt}. Connect the Gemini API in the environment settings to unlock deep, personalized AI coaching summaries!`,
+        insights: [
+          stepsCount < 6000 ? "Try to take a quick walk in the evening to hit 8,000 steps." : "Excellent job hitting your steps today! Keep it up.",
+          spendingAmt > 500 ? "You spent ₹" + spendingAmt + " today. Review your budget to ensure you are on track." : "Good job keeping expenses low today."
+        ]
+      };
+    }
+
+    res.json(summaryJson);
+
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+});
+
+export default router;

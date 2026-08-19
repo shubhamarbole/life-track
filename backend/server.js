@@ -12,6 +12,8 @@ import attendanceRoutes from './routes/attendance.js';
 import activityRoutes from './routes/activity.js';
 import workRoutes from './routes/work.js';
 import googleFitRoutes from './routes/googleFit.js';
+import gmailRoutes from './routes/gmail.js';
+import agentRoutes from './routes/agent.js';
 
 dotenv.config();
 
@@ -31,6 +33,8 @@ app.use('/api/attendance', attendanceRoutes);
 app.use('/api/activity', activityRoutes);
 app.use('/api/work', workRoutes);
 app.use('/api/auth/google', googleFitRoutes);
+app.use('/api/gmail', gmailRoutes);
+app.use('/api/agent', agentRoutes);
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
