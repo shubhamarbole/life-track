@@ -141,6 +141,9 @@ Your tasks:
       // 3. Try to parse work done/work summary command, e.g. "work done: completed database setup yesterday"
       const workDoneMatch = lowerMsg.match(/(?:work\s+done|work\s+summary|log\s+work)\s*(?::|to)\s*(.*)/i);
 
+      // 2. Try to parse basic expense command, e.g. "spent 500 on Food yesterday"
+      const expenseMatch = lowerMsg.match(/(?:spent|log|cost|expense)\s+(?:₹|rs\.?|\$)?(\d+(?:\.\d+)?)\s+(?:on|for)\s+(\w+)(?:\s+for\s+(.*))?/i);
+
       if (workDoneMatch) {
         const summaryText = workDoneMatch[1].trim();
         let cleanSummary = summaryText.replace(/\byesterday\b/gi, '').trim();
