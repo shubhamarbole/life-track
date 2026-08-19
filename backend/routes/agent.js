@@ -167,8 +167,19 @@ Your tasks:
         aiResponse.reply = `Rule Agent: Stopping active work session timer.`;
       }
       // Parse summary query
-      else if (lowerMsg.includes('summary') || lowerMsg.includes('how was my day')) {
+      else if (lowerMsg.includes('summary') || lowerMsg.includes('how was my day') || lowerMsg.includes('today')) {
         aiResponse.reply = `Rule Agent: Here is a quick summary of your day so far:\n- Work logged today: ${formatDuration(workSessions.filter(s => s.date === todayStr).reduce((acc, curr) => acc + (curr.duration || 0), 0))}\n- Steps walked: ${activities.find(a => a.date === todayStr)?.steps || 0}\n- Money spent today: ₹${expenses.filter(e => e.date === todayStr).reduce((acc, curr) => acc + curr.amount, 0)}`;
+      }
+      else if (lowerMsg.includes('yesterday')) {
+        const yesterdayDate = new Date();
+        yesterdayDate.setDate(yesterdayDate.getDate() - 1);
+        const yestStr = yesterdayDate.toISOString().split('T')[0];
+
+        const workYest = workSessions.filter(s => s.date === yestStr).reduce((acc, curr) => acc + (curr.duration || 0), 0);
+        const stepsYest = activities.find(a => a.date === yestStr)?.steps || 0;
+        const spentYest = expenses.filter(e => e.date === yestStr).reduce((acc, curr) => acc + curr.amount, 0);
+
+        aiResponse.reply = `Rule Agent: Here is a summary of your day **yesterday** (${yestStr}):\n- Work sessions: ${formatDuration(workYest)}\n- Steps walked: ${stepsYest.toLocaleString()} steps\n- Money spent: ₹${spentYest}`;
       }
     }
 
