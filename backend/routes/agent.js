@@ -29,7 +29,7 @@ const formatDuration = (ms) => {
 // @route   POST /api/agent/chat
 // @access  Private
 router.post('/chat', protect, async (req, res) => {
-  const { message, clientDate } = req.body;
+  const { message, clientDate, timezoneOffset } = req.body;
   const userId = req.user._id;
 
   if (!message) {
@@ -268,7 +268,16 @@ Your tasks:
         }
         else if (type === 'CHECK_IN') {
           const targetDate = payload.date || todayStr;
-          const checkInTime = payload.time ? new Date(`${targetDate}T${payload.time}`) : new Date();
+          let checkInTime = new Date();
+          if (payload.time) {
+            checkInTime = new Date(`${targetDate}T${payload.time}`);
+            if (timezoneOffset !== undefined) {
+              checkInTime.setMinutes(checkInTime.getMinutes() + parseInt(timezoneOffset));
+            }
+          } else if (targetDate !== todayStr) {
+            const target = new Date(targetDate);
+            checkInTime.setFullYear(target.getFullYear(), target.getMonth(), target.getDate());
+          }
 
           let att = await OfficeAttendance.findOne({ userId, date: targetDate });
           if (!att) {
@@ -281,12 +290,32 @@ Your tasks:
             actionExecuted = true;
             actionDetails = `Logged office arrival at ${checkInTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
           } else {
-            actionDetails = `Already checked in today at ${new Date(att.arrivalTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
+            // Overwrite existing check-in time if specific time is requested
+            if (payload.time) {
+              att.arrivalTime = checkInTime;
+              if (att.departureTime) {
+                att.officeDuration = new Date(att.departureTime).getTime() - checkInTime.getTime();
+              }
+              await att.save();
+              actionExecuted = true;
+              actionDetails = `Updated office arrival time to ${checkInTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} for ${targetDate}`;
+            } else {
+              actionDetails = `Already checked in today at ${new Date(att.arrivalTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
+            }
           }
         }
         else if (type === 'CHECK_OUT') {
           const targetDate = payload.date || todayStr;
-          const checkOutTime = payload.time ? new Date(`${targetDate}T${payload.time}`) : new Date();
+          let checkOutTime = new Date();
+          if (payload.time) {
+            checkOutTime = new Date(`${targetDate}T${payload.time}`);
+            if (timezoneOffset !== undefined) {
+              checkOutTime.setMinutes(checkOutTime.getMinutes() + parseInt(timezoneOffset));
+            }
+          } else if (targetDate !== todayStr) {
+            const target = new Date(targetDate);
+            checkOutTime.setFullYear(target.getFullYear(), target.getMonth(), target.getDate());
+          }
 
           let att = await OfficeAttendance.findOne({ userId, date: targetDate });
           if (att) {

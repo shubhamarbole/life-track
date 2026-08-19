@@ -104,7 +104,11 @@ const AiAssistant = () => {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`
         },
-        body: JSON.stringify({ message: text, clientDate })
+        body: JSON.stringify({ 
+          message: text, 
+          clientDate, 
+          timezoneOffset: new Date().getTimezoneOffset() 
+        })
       });
 
       if (res.ok) {
