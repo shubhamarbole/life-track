@@ -12,6 +12,13 @@ const Login = ({ onLoginSuccess }) => {
   const [scrollY, setScrollY] = useState(0);
   const [windowHeight, setWindowHeight] = useState(window.innerHeight);
 
+  // Mouse hover tilt states for cards
+  const [tiltCard1, setTiltCard1] = useState({ x: 0, y: 0 });
+  const [tiltDetail1, setTiltDetail1] = useState({ x: 0, y: 0 });
+  const [tiltDetail2, setTiltDetail2] = useState({ x: 0, y: 0 });
+  const [tiltDetail3, setTiltDetail3] = useState({ x: 0, y: 0 });
+  const [tiltForm, setTiltForm] = useState({ x: 0, y: 0 });
+
   const canvasRef = useRef(null);
   const navigate = useNavigate();
 
@@ -67,17 +74,17 @@ const Login = ({ onLoginSuccess }) => {
       { color: '#161b2e', speed: 0.4, amplitude: 8, wavelength: 130, offset: 80 }
     ];
 
-    // Pedestrian object
+    // Pedestrian object (Body Contoured Silhouette)
     class Pedestrian {
       constructor(direction = 1) {
-        this.dir = direction; // 1 = left to right, -1 = right to left
+        this.dir = direction;
         this.reset();
         this.x = Math.random() * width;
       }
 
       reset() {
-        this.x = this.dir === 1 ? -40 : width + 40;
-        this.speed = Math.random() * 0.5 + 0.5;
+        this.x = this.dir === 1 ? -60 : width + 60;
+        this.speed = Math.random() * 0.4 + 0.6;
         this.scale = Math.random() * 0.15 + 0.8;
         this.color = Math.random() > 0.5 ? '#a855f7' : '#6366f1';
         this.bobOffset = Math.random() * Math.PI;
@@ -85,66 +92,107 @@ const Login = ({ onLoginSuccess }) => {
 
       update() {
         this.x += this.speed * this.dir;
-        if (this.dir === 1 && this.x > width + 40) this.reset();
-        if (this.dir === -1 && this.x < -40) this.reset();
+        if (this.dir === 1 && this.x > width + 60) this.reset();
+        if (this.dir === -1 && this.x < -60) this.reset();
       }
 
       draw() {
         ctx.save();
         ctx.translate(this.x, groundY);
-        ctx.scale(this.scale, this.scale);
+        ctx.scale(this.scale * this.dir, this.scale); // Flips silhouette horizontally based on walking direction
 
         const cycle = tick * 0.08 + this.bobOffset;
         const bob = Math.abs(Math.sin(cycle * 2)) * 2;
 
-        ctx.strokeStyle = this.color;
         ctx.fillStyle = this.color;
-        ctx.lineWidth = 3;
+        ctx.strokeStyle = this.color;
         ctx.lineCap = 'round';
         ctx.lineJoin = 'round';
 
-        // Head
+        // 1. Draw head and neck
         ctx.beginPath();
-        ctx.arc(0, -60 + bob, 5.5, 0, Math.PI * 2);
+        ctx.arc(0, -60 + bob, 6.5, 0, Math.PI * 2);
         ctx.fill();
 
-        // Torso
+        ctx.lineWidth = 3.5;
         ctx.beginPath();
         ctx.moveTo(0, -54 + bob);
-        ctx.lineTo(0, -26 + bob);
+        ctx.lineTo(0, -50 + bob);
         ctx.stroke();
 
-        // Arms
-        const leftArmSwing = Math.sin(cycle) * 12;
+        // 2. Draw contoured torso (not a stick!)
         ctx.beginPath();
-        ctx.moveTo(0, -48 + bob);
-        ctx.lineTo(leftArmSwing, -30 + bob);
+        ctx.moveTo(-4, -50 + bob); // shoulder back
+        ctx.lineTo(4, -50 + bob);  // shoulder front
+        ctx.lineTo(2.5, -28 + bob); // hip front
+        ctx.lineTo(-2.5, -28 + bob); // hip back
+        ctx.closePath();
+        ctx.fill();
+
+        // 3. Draw double-jointed legs (Thigh + Calf) with thick silhouettes
+        ctx.lineWidth = 5.5;
+
+        // Front Leg (swings forward)
+        const frontLegAngle = Math.sin(cycle);
+        const frontKneeX = Math.sin(cycle) * 10 + 2;
+        const frontKneeY = -14 + bob;
+        const frontFootX = Math.sin(cycle - 0.2) * 14 + 4;
+        const frontFootY = 0;
+
+        ctx.beginPath();
+        ctx.moveTo(0, -28 + bob); // Hip
+        ctx.lineTo(frontKneeX, frontKneeY); // Knee joint
+        ctx.lineTo(frontFootX, frontFootY); // Foot
         ctx.stroke();
 
-        const rightArmSwing = -Math.sin(cycle) * 12;
+        // Back Leg (swings backward, knee bends during pull)
+        const backLegAngle = -Math.sin(cycle);
+        const backKneeX = -Math.sin(cycle) * 8 - 2;
+        const backKneeY = -14 + bob;
+        // Bends knee backwards during swing phase
+        const backFootX = -Math.sin(cycle + 0.3) * 14 - 4;
+        const backFootY = 0;
+
         ctx.beginPath();
-        ctx.moveTo(0, -48 + bob);
-        ctx.lineTo(rightArmSwing, -30 + bob);
+        ctx.moveTo(0, -28 + bob); // Hip
+        ctx.lineTo(backKneeX, backKneeY); // Knee
+        ctx.lineTo(backFootX, backFootY); // Foot
         ctx.stroke();
 
-        // Legs
-        const leftLegSwing = Math.sin(cycle) * 14;
+        // 4. Draw double-jointed arms with thickness
+        ctx.lineWidth = 4;
+
+        // Back Arm
+        const backArmAngle = -Math.sin(cycle);
+        const backElbowX = -Math.sin(cycle) * 8 - 2;
+        const backElbowY = -40 + bob;
+        const backHandX = -Math.sin(cycle - 0.2) * 12 - 4;
+        const backHandY = -28 + bob;
+
         ctx.beginPath();
-        ctx.moveTo(0, -26 + bob);
-        ctx.lineTo(leftLegSwing, 0);
+        ctx.moveTo(-2, -48 + bob); // Shoulder
+        ctx.lineTo(backElbowX, backElbowY);
+        ctx.lineTo(backHandX, backHandY);
         ctx.stroke();
 
-        const rightLegSwing = -Math.sin(cycle) * 14;
+        // Front Arm
+        const frontArmAngle = Math.sin(cycle);
+        const frontElbowX = Math.sin(cycle) * 8 + 2;
+        const frontElbowY = -40 + bob;
+        const frontHandX = Math.sin(cycle - 0.2) * 12 + 4;
+        const frontHandY = -28 + bob;
+
         ctx.beginPath();
-        ctx.moveTo(0, -26 + bob);
-        ctx.lineTo(rightLegSwing, 0);
+        ctx.moveTo(2, -48 + bob); // Shoulder
+        ctx.lineTo(frontElbowX, frontElbowY);
+        ctx.lineTo(frontHandX, frontHandY);
         ctx.stroke();
 
         ctx.restore();
       }
     }
 
-    // Cyclist object
+    // Cyclist object (Realistic contoured rider and structural bicycle)
     class Cyclist {
       constructor() {
         this.reset();
@@ -152,16 +200,16 @@ const Login = ({ onLoginSuccess }) => {
       }
 
       reset() {
-        this.x = -60;
-        this.speed = Math.random() * 1.0 + 1.6;
-        this.scale = Math.random() * 0.12 + 0.85;
+        this.x = -80;
+        this.speed = Math.random() * 0.8 + 1.8;
+        this.scale = Math.random() * 0.1 + 0.9;
         this.color = '#8f2ff0';
         this.wheelColor = '#475569';
       }
 
       update() {
         this.x += this.speed;
-        if (this.x > width + 60) this.reset();
+        if (this.x > width + 80) this.reset();
       }
 
       draw() {
@@ -169,86 +217,147 @@ const Login = ({ onLoginSuccess }) => {
         ctx.translate(this.x, groundY);
         ctx.scale(this.scale, this.scale);
 
-        const wheelRad = 12;
-        const rearWheelX = -20;
-        const frontWheelX = 20;
+        const wheelRad = 14;
+        const rearWheelX = -24;
+        const frontWheelX = 24;
         const bottomBracketX = 0;
         const saddleX = -8;
-        const handlebarX = 14;
+        const handlebarX = 16;
 
-        ctx.lineWidth = 2.2;
         ctx.lineCap = 'round';
         ctx.lineJoin = 'round';
 
-        // Wheels (Spokes)
-        const spinAngle = tick * 0.2;
+        // 1. Draw structural wheels (thick tires, rims, fine spokes)
+        const spinAngle = tick * 0.18;
         [rearWheelX, frontWheelX].forEach((wX) => {
+          // Thick outer tire
+          ctx.lineWidth = 3.5;
+          ctx.strokeStyle = '#090d16';
           ctx.beginPath();
           ctx.arc(wX, -wheelRad, wheelRad, 0, Math.PI * 2);
-          ctx.strokeStyle = this.wheelColor;
           ctx.stroke();
 
-          for (let i = 0; i < 4; i++) {
-            const angle = spinAngle + (i * Math.PI) / 4;
+          // Silver rim
+          ctx.lineWidth = 1;
+          ctx.strokeStyle = this.wheelColor;
+          ctx.beginPath();
+          ctx.arc(wX, -wheelRad, wheelRad - 1.5, 0, Math.PI * 2);
+          ctx.stroke();
+
+          // Spokes
+          ctx.lineWidth = 0.75;
+          for (let i = 0; i < 8; i++) {
+            const angle = spinAngle + (i * Math.PI) / 8;
             ctx.beginPath();
             ctx.moveTo(wX, -wheelRad);
-            ctx.lineTo(wX + Math.cos(angle) * wheelRad, -wheelRad + Math.sin(angle) * wheelRad);
+            ctx.lineTo(wX + Math.cos(angle) * (wheelRad - 2), -wheelRad + Math.sin(angle) * (wheelRad - 2));
             ctx.stroke();
           }
         });
 
-        // Frame
-        ctx.strokeStyle = '#94a3b8';
+        // 2. Tubular double-line frame (realistic geometric carbon post)
+        ctx.lineWidth = 2.5;
+        ctx.strokeStyle = '#64748b';
         ctx.beginPath();
+        // Triangle chainstay
         ctx.moveTo(rearWheelX, -wheelRad);
         ctx.lineTo(bottomBracketX, -wheelRad);
-        ctx.lineTo(saddleX, -30);
+        ctx.lineTo(saddleX, -34);
         ctx.lineTo(rearWheelX, -wheelRad);
+        // Downtube
         ctx.moveTo(bottomBracketX, -wheelRad);
-        ctx.lineTo(handlebarX, -36);
-        ctx.moveTo(saddleX, -30);
-        ctx.lineTo(handlebarX, -36);
-        ctx.moveTo(handlebarX, -36);
+        ctx.lineTo(handlebarX, -38);
+        // Toptube
+        ctx.moveTo(saddleX, -34);
+        ctx.lineTo(handlebarX, -38);
+        // Fork
+        ctx.moveTo(handlebarX, -38);
         ctx.lineTo(frontWheelX, -wheelRad);
         ctx.stroke();
 
         // Saddle
-        ctx.fillStyle = '#1e293b';
-        ctx.fillRect(saddleX - 5, -32, 10, 2.5);
-
-        // Handlebars
+        ctx.fillStyle = '#0f172a';
         ctx.beginPath();
-        ctx.moveTo(handlebarX, -36);
-        ctx.lineTo(handlebarX + 3, -38);
-        ctx.stroke();
-
-        // Rider
-        ctx.strokeStyle = this.color;
-        ctx.fillStyle = this.color;
-        ctx.lineWidth = 3.2;
-
-        const riderBob = Math.sin(tick * 0.14) * 1.2;
-        ctx.beginPath();
-        ctx.arc(-4, -50 + riderBob, 5, 0, Math.PI * 2);
+        ctx.moveTo(saddleX - 8, -36);
+        ctx.lineTo(saddleX + 4, -36);
+        ctx.lineTo(saddleX + 2, -33);
+        ctx.lineTo(saddleX - 6, -33);
+        ctx.closePath();
         ctx.fill();
 
+        // Drop Handlebars
+        ctx.lineWidth = 2;
+        ctx.strokeStyle = '#1e293b';
         ctx.beginPath();
-        ctx.moveTo(-6, -30);
-        ctx.lineTo(-4, -45 + riderBob);
+        ctx.moveTo(handlebarX, -38);
+        ctx.lineTo(handlebarX + 5, -40);
+        ctx.lineTo(handlebarX + 7, -35);
+        ctx.lineTo(handlebarX + 4, -33);
         ctx.stroke();
 
+        // 3. Contoured Rider (helmet, leaning back, bending knees)
+        ctx.fillStyle = this.color;
+        ctx.strokeStyle = this.color;
+
+        const riderBob = Math.sin(tick * 0.12) * 1.0;
+
+        // Head and Helmet
         ctx.beginPath();
-        ctx.moveTo(-4, -42 + riderBob);
-        ctx.lineTo(handlebarX, -36);
+        ctx.arc(-4, -54 + riderBob, 6, 0, Math.PI * 2);
+        ctx.fill();
+        // Helmet curve
+        ctx.lineWidth = 2.5;
+        ctx.strokeStyle = '#ffffff';
+        ctx.beginPath();
+        ctx.arc(-4, -56 + riderBob, 5, Math.PI, Math.PI * 2);
         ctx.stroke();
 
-        const pedalAngle = tick * 0.14;
-        const pedalX = Math.cos(pedalAngle) * 4.5;
-        const pedalY = Math.sin(pedalAngle) * 4.5 - wheelRad;
+        ctx.strokeStyle = this.color;
+        ctx.lineWidth = 5.5;
 
+        // Curved Leaning Back (not a stick!)
         ctx.beginPath();
-        ctx.moveTo(-6, -30);
-        ctx.lineTo(-2 + Math.cos(pedalAngle) * 2.5, -18);
+        ctx.moveTo(-6, -32); // Hip
+        ctx.quadraticCurveTo(-11, -44 + riderBob, -4, -48 + riderBob); // Curved spine to neck
+        ctx.stroke();
+
+        // Shoulder to handle arms
+        ctx.lineWidth = 3.5;
+        ctx.beginPath();
+        ctx.moveTo(-5, -46 + riderBob);
+        ctx.lineTo(handlebarX + 3, -36);
+        ctx.stroke();
+
+        // Pedaling geometry: Bending knees
+        const pedalAngle = tick * 0.12;
+        const pedalX = Math.cos(pedalAngle) * 5.5;
+        const pedalY = Math.sin(pedalAngle) * 5.5 - wheelRad;
+
+        // Knee joint calculation
+        const hipX = -6;
+        const hipY = -32;
+        const kneeX = (hipX + pedalX) / 2 + 7.5;
+        const kneeY = (hipY + pedalY) / 2 + 1;
+
+        // Thigh
+        ctx.lineWidth = 5.5;
+        ctx.beginPath();
+        ctx.moveTo(hipX, hipY);
+        ctx.lineTo(kneeX, kneeY);
+        ctx.stroke();
+
+        // Calf
+        ctx.lineWidth = 4.5;
+        ctx.beginPath();
+        ctx.moveTo(kneeX, kneeY);
+        ctx.lineTo(pedalX, pedalY);
+        ctx.stroke();
+
+        // Pedals
+        ctx.lineWidth = 2.5;
+        ctx.strokeStyle = '#475569';
+        ctx.beginPath();
+        ctx.moveTo(bottomBracketX, -wheelRad);
         ctx.lineTo(pedalX, pedalY);
         ctx.stroke();
 
@@ -362,7 +471,18 @@ const Login = ({ onLoginSuccess }) => {
     }
   };
 
-  // Interpolation helper for scroll positions
+  // Helper to handle mouse hover 3D tilt tracking
+  const handleMouseMove = (e, setTiltFn) => {
+    const rect = e.currentTarget.getBoundingClientRect();
+    const x = (e.clientX - rect.left) / rect.width - 0.5; // range: -0.5 to 0.5
+    const y = (e.clientY - rect.top) / rect.height - 0.5; // range: -0.5 to 0.5
+    setTiltFn({ x: x * 15, y: y * -15 }); // rotates up to 15 degrees
+  };
+
+  const handleMouseLeave = (setTiltFn) => {
+    setTiltFn({ x: 0, y: 0 });
+  };
+
   const getInterpolation = (start, end, current) => {
     const total = end - start;
     const progress = Math.max(0, Math.min(1, (current - start) / total));
@@ -460,10 +580,12 @@ const Login = ({ onLoginSuccess }) => {
             </p>
           </div>
 
-          {/* 3D Floating Security Shield Card */}
+          {/* 3D Floating Security Shield Card with Mouse Hover Tilt */}
           <div className="perspective-container" style={{ width: '100%', maxWidth: '580px', height: '240px', zIndex: 3 }}>
             <div 
               className="floating-3d-card" 
+              onMouseMove={(e) => handleMouseMove(e, setTiltCard1)}
+              onMouseLeave={() => handleMouseLeave(setTiltCard1)}
               style={{
                 width: '100%',
                 height: '100%',
@@ -472,8 +594,8 @@ const Login = ({ onLoginSuccess }) => {
                 display: 'flex',
                 flexDirection: 'column',
                 justifyContent: 'space-between',
-                // Angle turns flat as you scroll down
-                transform: `rotateX(${15 - section1Progress * 15}deg) rotateY(${-15 + section1Progress * 15}deg) translateZ(0px) scale(${1 - section1Progress * 0.15})`
+                // Combines scroll rotation and mouse tilt
+                transform: `rotateX(${15 - section1Progress * 15 + tiltCard1.y}deg) rotateY(${-15 + section1Progress * 15 + tiltCard1.x}deg) translateZ(20px) scale(${1 - section1Progress * 0.15})`
               }}
             >
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -526,10 +648,12 @@ const Login = ({ onLoginSuccess }) => {
             {/* Detail Card 1 */}
             <div 
               className="parallax-detail-card"
+              onMouseMove={(e) => handleMouseMove(e, setTiltDetail1)}
+              onMouseLeave={() => handleMouseLeave(setTiltDetail1)}
               style={{
                 borderRadius: '16px',
                 padding: '1.5rem',
-                transform: `translateY(${100 - section2Progress * 150}px) translateZ(40px) rotateY(10deg)`
+                transform: `translateY(${100 - section2Progress * 150}px) rotateX(${tiltDetail1.y}deg) rotateY(${10 + tiltDetail1.x}deg) translateZ(40px)`
               }}
             >
               <div style={{ width: '40px', height: '40px', borderRadius: '10px', backgroundColor: 'rgba(143, 47, 240, 0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#8f2ff0', marginBottom: '1.5rem' }}>
@@ -544,10 +668,12 @@ const Login = ({ onLoginSuccess }) => {
             {/* Detail Card 2 */}
             <div 
               className="parallax-detail-card"
+              onMouseMove={(e) => handleMouseMove(e, setTiltDetail2)}
+              onMouseLeave={() => handleMouseLeave(setTiltDetail2)}
               style={{
                 borderRadius: '16px',
                 padding: '1.5rem',
-                transform: `translateY(${180 - section2Progress * 230}px) translateZ(0px) rotateY(0deg)`
+                transform: `translateY(${180 - section2Progress * 230}px) rotateX(${tiltDetail2.y}deg) rotateY(${tiltDetail2.x}deg) translateZ(0px)`
               }}
             >
               <div style={{ width: '40px', height: '40px', borderRadius: '10px', backgroundColor: 'rgba(143, 47, 240, 0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#8f2ff0', marginBottom: '1.5rem' }}>
@@ -562,10 +688,12 @@ const Login = ({ onLoginSuccess }) => {
             {/* Detail Card 3 */}
             <div 
               className="parallax-detail-card"
+              onMouseMove={(e) => handleMouseMove(e, setTiltDetail3)}
+              onMouseLeave={() => handleMouseLeave(setTiltDetail3)}
               style={{
                 borderRadius: '16px',
                 padding: '1.5rem',
-                transform: `translateY(${60 - section2Progress * 110}px) translateZ(-40px) rotateY(-10deg)`
+                transform: `translateY(${60 - section2Progress * 110}px) rotateX(${tiltDetail3.y}deg) rotateY(${-10 + tiltDetail3.x}deg) translateZ(-40px)`
               }}
             >
               <div style={{ width: '40px', height: '40px', borderRadius: '10px', backgroundColor: 'rgba(143, 47, 240, 0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#8f2ff0', marginBottom: '1.5rem' }}>
@@ -591,14 +719,16 @@ const Login = ({ onLoginSuccess }) => {
           
           <div 
             className="login-form-3d-card"
+            onMouseMove={(e) => handleMouseMove(e, setTiltForm)}
+            onMouseLeave={() => handleMouseLeave(setTiltForm)}
             style={{
               width: '100%',
               maxWidth: '460px',
               padding: '2rem',
               zIndex: 3,
               opacity: section3Progress,
-              // Pivots forward: starts tilted back, aligns flat as scroll approaches bottom
-              transform: `rotateX(${-25 + section3Progress * 25}deg) translateZ(${-150 + section3Progress * 150}px) translateY(${100 - section3Progress * 100}px)`
+              // Combines bottom scroll-in roll with active mouse tilt
+              transform: `rotateX(${-25 + section3Progress * 25 + tiltForm.y}deg) rotateY(${tiltForm.x}deg) translateZ(${-150 + section3Progress * 150}px) translateY(${100 - section3Progress * 100}px)`
             }}
           >
             <div style={{ display: 'flex', gap: '0.45rem', alignItems: 'center', marginBottom: '0.75rem', justifyContent: 'center' }}>

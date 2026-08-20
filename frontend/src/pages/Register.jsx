@@ -12,6 +12,13 @@ const Register = ({ onLoginSuccess }) => {
   const [scrollY, setScrollY] = useState(0);
   const [windowHeight, setWindowHeight] = useState(window.innerHeight);
 
+  // Mouse hover tilt states for cards
+  const [tiltCard1, setTiltCard1] = useState({ x: 0, y: 0 });
+  const [tiltDetail1, setTiltDetail1] = useState({ x: 0, y: 0 });
+  const [tiltDetail2, setTiltDetail2] = useState({ x: 0, y: 0 });
+  const [tiltDetail3, setTiltDetail3] = useState({ x: 0, y: 0 });
+  const [tiltForm, setTiltForm] = useState({ x: 0, y: 0 });
+
   const canvasRef = useRef(null);
   const navigate = useNavigate();
 
@@ -32,7 +39,7 @@ const Register = ({ onLoginSuccess }) => {
     };
   }, []);
 
-  // 3D Particle Background Canvas animation
+  // 3D Particle Canvas Background animation (upgraded to realistic space particles)
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -48,7 +55,6 @@ const Register = ({ onLoginSuccess }) => {
     };
     window.addEventListener('resize', handleResize);
 
-    // Particle class representing dots moving in pseudo 3D space
     class Particle {
       constructor() {
         this.reset();
@@ -57,13 +63,12 @@ const Register = ({ onLoginSuccess }) => {
       reset() {
         this.x = (Math.random() - 0.5) * width * 1.5;
         this.y = (Math.random() - 0.5) * height * 1.5;
-        this.z = Math.random() * 800 + 200; // Depth coordinate
+        this.z = Math.random() * 800 + 200;
         this.size = Math.random() * 1.5 + 0.5;
-        this.color = Math.random() > 0.5 ? '#8f2ff0' : '#3a2ff0'; // Purple or Blue glow
+        this.color = Math.random() > 0.5 ? '#8f2ff0' : '#3a2ff0';
       }
 
       update(scrollVelocity) {
-        // Particles move forward based on scroll speed
         this.z -= 1.5 + scrollVelocity * 5;
         if (this.z <= 0) {
           this.reset();
@@ -71,8 +76,7 @@ const Register = ({ onLoginSuccess }) => {
       }
 
       draw() {
-        // Perspective projection: map 3D coords to 2D screen
-        const fov = 300; // Field of view depth
+        const fov = 300;
         const scale = fov / this.z;
         const screenX = this.x * scale + width / 2;
         const screenY = this.y * scale + height / 2;
@@ -81,7 +85,7 @@ const Register = ({ onLoginSuccess }) => {
           ctx.beginPath();
           ctx.arc(screenX, screenY, this.size * scale, 0, Math.PI * 2);
           ctx.fillStyle = this.color;
-          ctx.globalAlpha = Math.min(1, (1000 - this.z) / 800); // Fade out as they get deeper
+          ctx.globalAlpha = Math.min(1, (1000 - this.z) / 800);
           ctx.fill();
         }
       }
@@ -97,7 +101,6 @@ const Register = ({ onLoginSuccess }) => {
       ctx.globalAlpha = 1;
       ctx.fillRect(0, 0, width, height);
 
-      // Scroll speed shifts velocity
       const currentScroll = window.scrollY;
       const scrollVelocity = Math.abs(currentScroll - lastScrollY);
       lastScrollY = currentScroll;
@@ -140,7 +143,7 @@ const Register = ({ onLoginSuccess }) => {
           const data = await response.json();
           errorMsg = data.message || errorMsg;
         } catch (_) {
-          errorMsg = `Server error (Status ${response.status}).`;
+          errorMsg = `Server error. Please verify connections.`;
         }
         throw new Error(errorMsg);
       }
@@ -156,7 +159,18 @@ const Register = ({ onLoginSuccess }) => {
     }
   };
 
-  // Interpolation helper for scroll positions
+  // Helper to handle mouse hover 3D tilt tracking
+  const handleMouseMove = (e, setTiltFn) => {
+    const rect = e.currentTarget.getBoundingClientRect();
+    const x = (e.clientX - rect.left) / rect.width - 0.5;
+    const y = (e.clientY - rect.top) / rect.height - 0.5;
+    setTiltFn({ x: x * 15, y: y * -15 });
+  };
+
+  const handleMouseLeave = (setTiltFn) => {
+    setTiltFn({ x: 0, y: 0 });
+  };
+
   const getInterpolation = (start, end, current) => {
     const total = end - start;
     const progress = Math.max(0, Math.min(1, (current - start) / total));
@@ -254,10 +268,12 @@ const Register = ({ onLoginSuccess }) => {
             </p>
           </div>
 
-          {/* 3D Floating Dashboard Card */}
+          {/* 3D Floating Dashboard Card with Mouse Hover Tilt */}
           <div className="perspective-container" style={{ width: '100%', maxWidth: '580px', height: '240px', zIndex: 3 }}>
             <div 
               className="floating-3d-dashboard" 
+              onMouseMove={(e) => handleMouseMove(e, setTiltCard1)}
+              onMouseLeave={() => handleMouseLeave(setTiltCard1)}
               style={{
                 width: '100%',
                 height: '100%',
@@ -266,8 +282,8 @@ const Register = ({ onLoginSuccess }) => {
                 display: 'flex',
                 flexDirection: 'column',
                 justifyContent: 'space-between',
-                // Rotates from angled to flat as user scrolls
-                transform: `rotateX(${15 - section1Progress * 15}deg) rotateY(${-15 + section1Progress * 15}deg) translateZ(0px) scale(${1 - section1Progress * 0.15})`
+                // Combines scroll and mouse tilt
+                transform: `rotateX(${15 - section1Progress * 15 + tiltCard1.y}deg) rotateY(${-15 + section1Progress * 15 + tiltCard1.x}deg) translateZ(20px) scale(${1 - section1Progress * 0.15})`
               }}
             >
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -329,10 +345,12 @@ const Register = ({ onLoginSuccess }) => {
             {/* Card 1: Hours */}
             <div 
               className="parallax-feature-card"
+              onMouseMove={(e) => handleMouseMove(e, setTiltDetail1)}
+              onMouseLeave={() => handleMouseLeave(setTiltDetail1)}
               style={{
                 borderRadius: '16px',
                 padding: '1.5rem',
-                transform: `translateY(${100 - section2Progress * 150}px) translateZ(40px) rotateY(10deg)`
+                transform: `translateY(${100 - section2Progress * 150}px) rotateX(${tiltDetail1.y}deg) rotateY(${10 + tiltDetail1.x}deg) translateZ(40px)`
               }}
             >
               <div style={{ width: '40px', height: '40px', borderRadius: '10px', backgroundColor: 'rgba(143, 47, 240, 0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#8f2ff0', marginBottom: '1.5rem' }}>
@@ -347,10 +365,12 @@ const Register = ({ onLoginSuccess }) => {
             {/* Card 2: Steps */}
             <div 
               className="parallax-feature-card"
+              onMouseMove={(e) => handleMouseMove(e, setTiltDetail2)}
+              onMouseLeave={() => handleMouseLeave(setTiltDetail2)}
               style={{
                 borderRadius: '16px',
                 padding: '1.5rem',
-                transform: `translateY(${180 - section2Progress * 230}px) translateZ(0px) rotateY(0deg)`
+                transform: `translateY(${180 - section2Progress * 230}px) rotateX(${tiltDetail2.y}deg) rotateY(${tiltDetail2.x}deg) translateZ(0px)`
               }}
             >
               <div style={{ width: '40px', height: '40px', borderRadius: '10px', backgroundColor: 'rgba(255, 149, 0, 0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#ff9500', marginBottom: '1.5rem' }}>
@@ -365,10 +385,12 @@ const Register = ({ onLoginSuccess }) => {
             {/* Card 3: Money */}
             <div 
               className="parallax-feature-card"
+              onMouseMove={(e) => handleMouseMove(e, setTiltDetail3)}
+              onMouseLeave={() => handleMouseLeave(setTiltDetail3)}
               style={{
                 borderRadius: '16px',
                 padding: '1.5rem',
-                transform: `translateY(${60 - section2Progress * 110}px) translateZ(-40px) rotateY(-10deg)`
+                transform: `translateY(${60 - section2Progress * 110}px) rotateX(${tiltDetail3.y}deg) rotateY(${-10 + tiltDetail3.x}deg) translateZ(-40px)`
               }}
             >
               <div style={{ width: '40px', height: '40px', borderRadius: '10px', backgroundColor: 'rgba(52, 199, 89, 0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#34c759', marginBottom: '1.5rem' }}>
@@ -394,14 +416,15 @@ const Register = ({ onLoginSuccess }) => {
           
           <div 
             className="register-form-3d-card"
+            onMouseMove={(e) => handleMouseMove(e, setTiltForm)}
+            onMouseLeave={() => handleMouseLeave(setTiltForm)}
             style={{
               width: '100%',
               maxWidth: '460px',
               padding: '2rem',
               zIndex: 3,
               opacity: section3Progress,
-              // Pivots forward: starts at -25deg backward tilt and aligns flat as user reaches bottom
-              transform: `rotateX(${-25 + section3Progress * 25}deg) translateZ(${-150 + section3Progress * 150}px) translateY(${100 - section3Progress * 100}px)`
+              transform: `rotateX(${-25 + section3Progress * 25 + tiltForm.y}deg) rotateY(${tiltForm.x}deg) translateZ(${-150 + section3Progress * 150}px) translateY(${100 - section3Progress * 100}px)`
             }}
           >
             <div style={{ display: 'flex', gap: '0.45rem', alignItems: 'center', marginBottom: '0.75rem', justifyContent: 'center' }}>
