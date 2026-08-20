@@ -4,6 +4,7 @@ import dotenv from 'dotenv';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import connectDB from './config/db.js';
+import { logger } from './utils/logger.js';
 
 // Import Routes
 import authRoutes from './routes/auth.js';
@@ -20,12 +21,29 @@ const __dirname = path.dirname(__filename);
 
 dotenv.config({ path: path.join(__dirname, '.env') });
 
-console.log("Loaded GEMINI_API_KEY:", process.env.GEMINI_API_KEY ? `Yes (${process.env.GEMINI_API_KEY.substring(0, 5)}...)` : 'No');
+logger.info(`Loaded GEMINI_API_KEY: ${process.env.GEMINI_API_KEY ? 'Yes' : 'No'}`);
 
 // Connect to Database
 connectDB();
 
 const app = express();
+
+// Logging middleware
+app.use((req, res, next) => {
+  const start = Date.now();
+  res.on('finish', () => {
+    const duration = Date.now() - start;
+    const msg = `${req.method} ${req.originalUrl} - Status: ${res.statusCode} (${duration}ms)`;
+    if (res.statusCode >= 500) {
+      logger.error(msg);
+    } else if (res.statusCode >= 400) {
+      logger.warn(msg);
+    } else {
+      logger.success(msg);
+    }
+  });
+  next();
+});
 
 // Middleware
 app.use(cors());
@@ -62,9 +80,9 @@ if (process.env.NODE_ENV === 'production') {
 
 // Error handling middleware
 app.use((err, req, res, next) => {
+  logger.error(`Handler Error on ${req.method} ${req.originalUrl}: ${err.message}`, err.stack);
   const statusCode = res.statusCode === 200 ? 500 : res.statusCode;
-  res.status(statusCode);
-  res.json({
+  res.status(statusCode).json({
     message: err.message,
     stack: process.env.NODE_ENV === 'production' ? null : err.stack,
   });
@@ -73,5 +91,5 @@ app.use((err, req, res, next) => {
 const PORT = process.env.PORT || 5000;
 
 app.listen(PORT, () => {
-  console.log(`Server is running in development mode on port ${PORT}`);
+  logger.success(`Server is running in ${process.env.NODE_ENV || 'development'} mode on port ${PORT}`);
 });

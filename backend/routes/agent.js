@@ -488,4 +488,18 @@ Return a JSON object conforming exactly to this schema:
   }
 });
 
+// @route   GET /api/agent/activities
+// @desc    Get agent activities logs
+// @access  Private
+router.get('/activities', protect, async (req, res) => {
+  try {
+    const logs = await AgentActivity.find({ userId: req.user._id })
+      .sort({ timestamp: -1 })
+      .limit(50);
+    res.json(logs);
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+});
+
 export default router;

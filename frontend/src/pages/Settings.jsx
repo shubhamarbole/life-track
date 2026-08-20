@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { MapPin, ShieldAlert, Award, Compass, RefreshCw, Trash2, HelpCircle } from 'lucide-react';
+import { MapPin, ShieldAlert, Award, Compass, RefreshCw, Trash2, HelpCircle, Terminal } from 'lucide-react';
 import { 
   isNativeApp, 
   requestHealthAuth, 
@@ -49,6 +49,34 @@ const Settings = ({ user, onLogout, triggerReloadUser }) => {
 
   const token = localStorage.getItem('lifetrack_token');
   const todayStr = new Date().toISOString().split('T')[0];
+
+  const [logs, setLogs] = useState([]);
+  const [logsLoading, setLogsLoading] = useState(false);
+  const [logsError, setLogsError] = useState('');
+
+  const fetchLogs = async () => {
+    setLogsLoading(true);
+    setLogsError('');
+    try {
+      const res = await fetch('/api/agent/activities', {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setLogs(data);
+      } else {
+        throw new Error('Failed to fetch activity logs');
+      }
+    } catch (err) {
+      setLogsError(err.message);
+    } finally {
+      setLogsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchLogs();
+  }, []);
 
   useEffect(() => {
     if (user) {
@@ -845,6 +873,78 @@ const Settings = ({ user, onLogout, triggerReloadUser }) => {
             </>
           )}
         </button>
+      </div>
+
+      {/* 2.9 Centralized Logs Viewer Dashboard */}
+      <div className="card">
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem', flexWrap: 'wrap', gap: '0.5rem' }}>
+          <h3 style={{ fontSize: '1.1rem', fontWeight: 700, margin: 0, display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+            <Terminal size={20} style={{ color: 'var(--primary)' }} />
+            Agent &amp; System Logs
+          </h3>
+          <button 
+            onClick={fetchLogs} 
+            className="btn btn-secondary"
+            style={{ padding: '0.35rem 0.75rem', fontSize: '0.75rem', display: 'flex', alignItems: 'center', gap: '0.35rem', borderRadius: '8px', minHeight: 0 }}
+            disabled={logsLoading}
+          >
+            <RefreshCw size={12} className={logsLoading ? "animate-spin" : ""} />
+            Refresh
+          </button>
+        </div>
+        <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginBottom: '1rem' }}>
+          Recent automation triggers, AI executions, and system events.
+        </p>
+
+        {logsError && (
+          <div style={{ padding: '0.75rem', backgroundColor: 'var(--danger-light)', color: 'var(--danger)', borderRadius: 'var(--radius-md)', marginBottom: '1rem', fontSize: '0.85rem' }}>
+            {logsError}
+          </div>
+        )}
+
+        {logsLoading && logs.length === 0 ? (
+          <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>Loading activity logs...</p>
+        ) : logs.length === 0 ? (
+          <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem', fontStyle: 'italic' }}>No system logs available yet.</p>
+        ) : (
+          <div style={{ 
+            backgroundColor: '#0f172a', 
+            borderRadius: '12px', 
+            padding: '1rem', 
+            border: '1px solid var(--border)',
+            maxHeight: '300px',
+            overflowY: 'auto',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '0.75rem',
+            fontFamily: 'monospace'
+          }}>
+            {logs.map((log) => {
+              // Format category color based on action type
+              let actionColor = '#38bdf8'; // Blue info default
+              if (log.action.includes('checkin') || log.action.includes('CHECK_IN') || log.action.includes('Entered')) actionColor = '#4ade80'; // Green
+              if (log.action.includes('checkout') || log.action.includes('CHECK_OUT') || log.action.includes('Exited')) actionColor = '#fca5a5'; // Light red
+              if (log.action.includes('work') || log.action.includes('WORK')) actionColor = '#c084fc'; // Purple
+              if (log.action.includes('expense') || log.action.includes('EXPENSE')) actionColor = '#fbbf24'; // Orange
+
+              return (
+                <div key={log._id} style={{ fontSize: '0.75rem', borderBottom: '1px solid rgba(255,255,255,0.04)', paddingBottom: '0.5rem' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.5rem', marginBottom: '0.25rem' }}>
+                    <span style={{ color: actionColor, fontWeight: 700 }}>
+                      [{log.action.toUpperCase()}]
+                    </span>
+                    <span style={{ color: '#64748b' }}>
+                      {new Date(log.timestamp).toLocaleString([], { hour12: false })}
+                    </span>
+                  </div>
+                  <div style={{ color: '#cbd5e1', whiteSpace: 'pre-wrap', lineHeight: '1.4' }}>
+                    {log.details}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
       </div>
 
       {/* 3. Privacy & Disclosures */}
