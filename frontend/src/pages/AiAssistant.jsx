@@ -37,18 +37,28 @@ const AiAssistant = () => {
 
   // Standard Voice Recognition state (for regular push-to-talk button)
   const [isListening, setIsListening] = useState(false);
+  const activeUtteranceRef = useRef(null);
   const recognitionRef = useRef(null);
 
-  // Strip markdown formatting for Speech Synthesis
+  // Strip markdown formatting and translate symbols for natural Speech Synthesis
   const stripMarkdown = (text) => {
     if (!text) return '';
     return text
+      // Clean up markdown bold/italic formatting
       .replace(/\*\*(.*?)\*\*/g, '$1')
       .replace(/\*(.*?)\*/g, '$1')
-      .replace(/-\s+/g, '')
-      .replace(/#+\s+/g, '')
-      .replace(/[`_]/g, '')
-      .replace(/[\u2700-\u27BF]|[\uE000-\uF8FF]|\uD83C[\uDC00-\uDFFF]|\uD83D[\uDC00-\uDFFF]|[\u2011-\u26FF]|\uD83E[\uDC00-\uDFFF]/g, ''); // Emojis
+      // Clean up inline code blocks and general markdown characters
+      .replace(/`([^`]+)`/g, '$1')
+      .replace(/[`_#\-*]/g, ' ')
+      // Translate symbols and common abbreviations for smooth speech
+      .replace(/₹/g, ' rupees ')
+      .replace(/\b(\d+)h\b/gi, '$1 hours')
+      .replace(/\b(\d+)m\b/gi, '$1 minutes')
+      // Strip emojis (Web speech synthesis reads emoji descriptions literally, causing stutters)
+      .replace(/[\u2700-\u27BF]|[\uE000-\uF8FF]|\uD83C[\uDC00-\uDFFF]|\uD83D[\uDC00-\uDFFF]|[\u2011-\u26FF]|\uD83E[\uDC00-\uDFFF]/g, '')
+      // Remove double spaces
+      .replace(/\s+/g, ' ')
+      .trim();
   };
 
   const startRecognitionSafely = () => {
@@ -65,20 +75,36 @@ const AiAssistant = () => {
     window.speechSynthesis.cancel(); // Stop active speaking
 
     const cleanedText = stripMarkdown(text);
+    if (!cleanedText) {
+      if (isConversationalModeRef.current) {
+        setVoiceState('listening');
+        startRecognitionSafely();
+      }
+      return;
+    }
+
     const utterance = new SpeechSynthesisUtterance(cleanedText);
+    activeUtteranceRef.current = utterance; // Keep active reference to prevent Chrome/Safari garbage collection cut-offs
 
     // Pick a natural human voice
     const voices = window.speechSynthesis.getVoices();
-    const naturalVoice = voices.find(v => 
-      v.lang.startsWith('en') && 
-      (v.name.includes('Google') || v.name.includes('Natural') || v.name.includes('Microsoft') || v.name.includes('Samantha'))
-    );
+    const getBestVoice = (voiceList) => {
+      return voiceList.find(v => v.lang.startsWith('en') && v.name.includes('Google US English')) ||
+             voiceList.find(v => v.lang.startsWith('en') && v.name.includes('Natural')) ||
+             voiceList.find(v => v.lang.startsWith('en') && (v.name.includes('Google') || v.name.includes('Microsoft'))) ||
+             voiceList.find(v => v.lang.startsWith('en') && v.name.includes('Samantha')) ||
+             voiceList.find(v => v.lang.startsWith('en')) ||
+             voiceList[0];
+    };
+    
+    const naturalVoice = getBestVoice(voices);
     if (naturalVoice) utterance.voice = naturalVoice;
 
     utterance.rate = 1.05;
     utterance.pitch = 1.0;
 
     utterance.onend = () => {
+      activeUtteranceRef.current = null;
       if (isConversationalModeRef.current) {
         setVoiceState('listening');
         startRecognitionSafely();
@@ -87,6 +113,7 @@ const AiAssistant = () => {
 
     utterance.onerror = (e) => {
       console.error("Speech Synthesis Error:", e);
+      activeUtteranceRef.current = null;
       if (isConversationalModeRef.current) {
         setVoiceState('listening');
         startRecognitionSafely();
