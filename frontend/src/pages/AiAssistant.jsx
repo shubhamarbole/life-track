@@ -160,6 +160,8 @@ const AiAssistant = () => {
       rec.interimResults = false;
       rec.lang = 'en-US';
 
+      let hasPermission = true;
+
       rec.onstart = () => {
         setIsListening(true);
         if (isConversationalModeRef.current) {
@@ -171,10 +173,10 @@ const AiAssistant = () => {
         setIsListening(false);
         // Automatically restart listening in conversational mode if still active
         if (isConversationalModeRef.current && voiceStateRef.current === 'listening') {
-          startRecognitionSafely();
-        } else if (!isConversationalModeRef.current) {
-          // Keep background wake-word listener active
-          startRecognitionSafely();
+          setTimeout(() => startRecognitionSafely(), 300);
+        } else if (!isConversationalModeRef.current && hasPermission) {
+          // Keep background wake-word listener active with a delay
+          setTimeout(() => startRecognitionSafely(), 1000);
         }
       };
 
@@ -210,31 +212,34 @@ const AiAssistant = () => {
       rec.onerror = (event) => {
         console.log("Speech Recognition Error/Status:", event.error);
         if (event.error === 'not-allowed') {
+          hasPermission = false; // Disable background loops if denied/blocked
           console.warn("Microphone access was denied or not authorized yet.");
         } else {
-          // Restart background / conversational listener on other errors (like no-speech)
+          // Restart background / conversational listener on other errors with a delay
           setTimeout(() => {
             if (isConversationalModeRef.current && voiceStateRef.current === 'listening') {
               startRecognitionSafely();
-            } else if (!isConversationalModeRef.current) {
+            } else if (!isConversationalModeRef.current && hasPermission) {
               startRecognitionSafely();
             }
-          }, 1000);
+          }, 1500);
         }
       };
 
       recognitionRef.current = rec;
-    }
-  }, []);
 
-  // Background Wake Word listener trigger on mount
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      if (!isConversationalModeRef.current) {
-        startRecognitionSafely();
-      }
-    }, 1500);
-    return () => clearTimeout(timer);
+      // Trigger start on interaction click/tap to bypass browser security blocks
+      const triggerStart = () => {
+        hasPermission = true;
+        if (!isConversationalModeRef.current) {
+          startRecognitionSafely();
+        }
+        window.removeEventListener('click', triggerStart);
+        window.removeEventListener('touchstart', triggerStart);
+      };
+      window.addEventListener('click', triggerStart);
+      window.addEventListener('touchstart', triggerStart);
+    }
   }, []);
 
   // Handle start voice trigger from search parameters (e.g. redirected from Dashboard)

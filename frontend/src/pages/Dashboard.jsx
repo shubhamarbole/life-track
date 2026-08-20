@@ -90,12 +90,22 @@ const Dashboard = ({ user, triggerReloadUser }) => {
     rec.lang = 'en-US';
 
     let isComponentMounted = true;
+    let hasPermission = true;
 
-    rec.onend = () => {
-      if (isComponentMounted) {
+    const startListener = () => {
+      if (isComponentMounted && hasPermission) {
         try {
           rec.start();
-        } catch (e) {}
+        } catch (e) {
+          // Already running
+        }
+      }
+    };
+
+    rec.onend = () => {
+      if (isComponentMounted && hasPermission) {
+        // Restart after 1 second to prevent high-frequency loops if blocked
+        setTimeout(startListener, 1000);
       }
     };
 
@@ -108,20 +118,33 @@ const Dashboard = ({ user, triggerReloadUser }) => {
     };
 
     rec.onerror = (e) => {
-      // Silence background console noise
+      console.log("Dashboard Speech Error:", e.error);
+      if (e.error === 'not-allowed') {
+        hasPermission = false; // Stop restarting if denied/blocked
+      }
     };
 
     recognitionRef.current = rec;
 
-    const startTimer = setTimeout(() => {
-      try {
-        rec.start();
-      } catch (e) {}
-    }, 1500);
+    // Trigger on first click or tap to initialize speech channel
+    const triggerStart = () => {
+      hasPermission = true;
+      startListener();
+      window.removeEventListener('click', triggerStart);
+      window.removeEventListener('touchstart', triggerStart);
+    };
+
+    window.addEventListener('click', triggerStart);
+    window.addEventListener('touchstart', triggerStart);
+
+    // Also attempt startup after 2 seconds
+    const startTimer = setTimeout(startListener, 2000);
 
     return () => {
       isComponentMounted = false;
       clearTimeout(startTimer);
+      window.removeEventListener('click', triggerStart);
+      window.removeEventListener('touchstart', triggerStart);
       try {
         rec.stop();
       } catch (e) {}
