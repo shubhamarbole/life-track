@@ -200,7 +200,20 @@ const AiAssistant = () => {
         } else {
           // Wake Word detection in background
           const lowerText = transcript.toLowerCase();
-          if (lowerText.includes('hey atlas') || lowerText.includes('hey, atlas') || lowerText.includes('hello atlas') || lowerText.includes('atlas') || lowerText.includes('ok atlas')) {
+          const isMatch = 
+            lowerText.includes('hey atlas') || 
+            lowerText.includes('hey, atlas') || 
+            lowerText.includes('hello atlas') || 
+            lowerText.includes('atlas') || 
+            lowerText.includes('ok atlas') || 
+            lowerText.includes('hay atlas') || 
+            lowerText.includes('hi atlas') || 
+            lowerText.includes('he atlas') || 
+            lowerText.includes('eatless') || 
+            lowerText.includes('axis') || 
+            lowerText.includes('atlass');
+
+          if (isMatch) {
             playChime();
             setIsConversationalMode(true);
             setVoiceState('speaking');

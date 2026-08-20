@@ -111,7 +111,21 @@ const Dashboard = ({ user, triggerReloadUser }) => {
 
     rec.onresult = (event) => {
       const transcript = event.results[0][0].transcript.toLowerCase();
-      if (transcript.includes('hey atlas') || transcript.includes('hey, atlas') || transcript.includes('hello atlas') || transcript.includes('atlas') || transcript.includes('ok atlas')) {
+      console.log("Dashboard transcribed:", transcript);
+      const isMatch = 
+        transcript.includes('hey atlas') || 
+        transcript.includes('hey, atlas') || 
+        transcript.includes('hello atlas') || 
+        transcript.includes('atlas') || 
+        transcript.includes('ok atlas') || 
+        transcript.includes('hay atlas') || 
+        transcript.includes('hi atlas') || 
+        transcript.includes('he atlas') || 
+        transcript.includes('eatless') || 
+        transcript.includes('axis') || 
+        transcript.includes('atlass');
+
+      if (isMatch) {
         playChime();
         navigate('/assistant?voice=start');
       }
@@ -680,6 +694,24 @@ const Dashboard = ({ user, triggerReloadUser }) => {
         <div className="search-container">
           <span style={{ color: '#8e8e93', fontSize: '0.85rem' }}>🔍</span>
           <input type="text" className="search-input" placeholder="Search" />
+        </div>
+
+        {/* Wake Word Status Banner */}
+        <div style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: '0.75rem',
+          padding: '0.75rem 1rem',
+          borderRadius: '12px',
+          backgroundColor: 'rgba(168, 85, 247, 0.1)',
+          border: '1px solid rgba(168, 85, 247, 0.2)',
+          marginBottom: '1.25rem',
+          fontSize: '0.85rem',
+          color: '#c084fc',
+          fontWeight: 500
+        }}>
+          <Sparkles size={16} className="animate-pulse" style={{ color: '#a855f7' }} />
+          <span>Tap anywhere and say <strong>"Hey Atlas"</strong> to speak to your AI!</span>
         </div>
 
         {/* Main Grid Division */}
