@@ -131,7 +131,15 @@ const AiAssistant = () => {
     utterance.rate = 1.05;
     utterance.pitch = 1.0;
 
-    utterance.onend = () => {
+    // Estimate speaking time in milliseconds: standard rate is ~150 words per minute (~2.5 words per second)
+    // We add 3.5 seconds buffer.
+    const wordCount = cleanedText.split(/\s+/).length;
+    const estimatedTimeMs = (wordCount / 2.5) * 1000 + 3500;
+
+    let backupTimer = null;
+
+    const cleanupAndListen = () => {
+      if (backupTimer) clearTimeout(backupTimer);
       activeUtteranceRef.current = null;
       if (isConversationalModeRef.current) {
         setVoiceState('listening');
@@ -139,14 +147,23 @@ const AiAssistant = () => {
       }
     };
 
+    utterance.onend = () => {
+      cleanupAndListen();
+    };
+
     utterance.onerror = (e) => {
       console.error("Speech Synthesis Error:", e);
-      activeUtteranceRef.current = null;
-      if (isConversationalModeRef.current) {
-        setVoiceState('listening');
-        startRecognitionSafely();
-      }
+      cleanupAndListen();
     };
+
+    // Set backup recovery timer in case browser fails to fire onend event
+    backupTimer = setTimeout(() => {
+      if (isConversationalModeRef.current && voiceStateRef.current === 'speaking') {
+        console.warn("Speech Synthesis 'onend' timed out! Force returning to listening state.");
+        window.speechSynthesis.cancel();
+        cleanupAndListen();
+      }
+    }, estimatedTimeMs);
 
     window.speechSynthesis.speak(utterance);
   };
