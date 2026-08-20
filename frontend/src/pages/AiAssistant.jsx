@@ -181,8 +181,20 @@ const AiAssistant = () => {
       rec.onresult = (event) => {
         const transcript = event.results[0][0].transcript;
         if (isConversationalModeRef.current) {
-          setVoiceState('processing');
-          handleSendVoiceMessage(transcript);
+          const lowerText = transcript.toLowerCase().trim();
+          if (lowerText.includes('thank you') || lowerText.includes('thanks') || lowerText === 'exit' || lowerText === 'goodbye') {
+            window.speechSynthesis.cancel();
+            const utterance = new SpeechSynthesisUtterance("You're welcome! Goodbye.");
+            utterance.onend = () => {
+              handleExitVoiceMode();
+            };
+            activeUtteranceRef.current = utterance;
+            window.speechSynthesis.speak(utterance);
+            setVoiceState('speaking');
+          } else {
+            setVoiceState('processing');
+            handleSendVoiceMessage(transcript);
+          }
         } else {
           // Wake Word detection in background
           const lowerText = transcript.toLowerCase();
