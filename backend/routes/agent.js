@@ -109,8 +109,14 @@ Your tasks:
 
         const geminiData = await response.json();
         if (response.ok) {
-          const rawText = geminiData.candidates?.[0]?.content?.parts?.[0]?.text;
-          aiResponse = JSON.parse(rawText);
+          let rawText = geminiData.candidates?.[0]?.content?.parts?.[0]?.text;
+          if (rawText) {
+            rawText = rawText.trim();
+            if (rawText.startsWith('```')) {
+              rawText = rawText.replace(/^```(?:json)?\n?/i, '').replace(/\n?```$/, '').trim();
+            }
+            aiResponse = JSON.parse(rawText);
+          }
         } else {
           console.error('Gemini API Error:', geminiData);
         }
@@ -465,8 +471,14 @@ Return a JSON object conforming exactly to this schema:
 
         const geminiData = await response.json();
         if (response.ok) {
-          const rawText = geminiData.candidates?.[0]?.content?.parts?.[0]?.text;
-          summaryJson = JSON.parse(rawText);
+          let rawText = geminiData.candidates?.[0]?.content?.parts?.[0]?.text;
+          if (rawText) {
+            rawText = rawText.trim();
+            if (rawText.startsWith('```')) {
+              rawText = rawText.replace(/^```(?:json)?\n?/i, '').replace(/\n?```$/, '').trim();
+            }
+            summaryJson = JSON.parse(rawText);
+          }
         }
       } catch (geminiErr) {
         console.error('Gemini summary call error:', geminiErr);
