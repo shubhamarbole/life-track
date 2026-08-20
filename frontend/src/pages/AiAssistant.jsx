@@ -61,6 +61,34 @@ const AiAssistant = () => {
       .trim();
   };
 
+  const playChime = () => {
+    try {
+      const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      const osc1 = audioCtx.createOscillator();
+      const osc2 = audioCtx.createOscillator();
+      const gainNode = audioCtx.createGain();
+
+      osc1.connect(gainNode);
+      osc2.connect(gainNode);
+      gainNode.connect(audioCtx.destination);
+
+      gainNode.gain.setValueAtTime(0, audioCtx.currentTime);
+      gainNode.gain.linearRampToValueAtTime(0.2, audioCtx.currentTime + 0.05);
+      gainNode.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + 0.4);
+
+      osc1.frequency.setValueAtTime(523.25, audioCtx.currentTime); // C5
+      osc1.frequency.setValueAtTime(659.25, audioCtx.currentTime + 0.12); // E5
+      osc2.frequency.setValueAtTime(783.99, audioCtx.currentTime + 0.12); // G5
+
+      osc1.start();
+      osc2.start(audioCtx.currentTime + 0.12);
+      osc1.stop(audioCtx.currentTime + 0.4);
+      osc2.stop(audioCtx.currentTime + 0.4);
+    } catch (err) {
+      console.error("Failed to play activation chime:", err);
+    }
+  };
+
   const startRecognitionSafely = () => {
     if (!recognitionRef.current) return;
     try {
@@ -144,6 +172,9 @@ const AiAssistant = () => {
         // Automatically restart listening in conversational mode if still active
         if (isConversationalModeRef.current && voiceStateRef.current === 'listening') {
           startRecognitionSafely();
+        } else if (!isConversationalModeRef.current) {
+          // Keep background wake-word listener active
+          startRecognitionSafely();
         }
       };
 
@@ -153,30 +184,45 @@ const AiAssistant = () => {
           setVoiceState('processing');
           handleSendVoiceMessage(transcript);
         } else {
-          setInputText(prev => prev + (prev ? ' ' : '') + transcript);
+          // Wake Word detection in background
+          const lowerText = transcript.toLowerCase();
+          if (lowerText.includes('hey atlas') || lowerText.includes('hey, atlas') || lowerText.includes('hello atlas') || lowerText.includes('atlas') || lowerText.includes('ok atlas')) {
+            playChime();
+            setIsConversationalMode(true);
+            setVoiceState('speaking');
+            speakText("Yes, I'm here. How can I help you today?");
+          }
         }
       };
 
       rec.onerror = (event) => {
-        console.error("Speech Recognition Error:", event.error);
+        console.log("Speech Recognition Error/Status:", event.error);
         if (event.error === 'not-allowed') {
-          alert("Microphone access was denied. Please allow microphone permissions in your browser settings!");
-          handleExitVoiceMode();
-        } else if (event.error === 'no-speech') {
-          console.log("No speech detected.");
+          console.warn("Microphone access was denied or not authorized yet.");
         } else {
-          if (isConversationalModeRef.current) {
-            setTimeout(() => {
-              if (voiceStateRef.current === 'listening') {
-                startRecognitionSafely();
-              }
-            }, 1000);
-          }
+          // Restart background / conversational listener on other errors (like no-speech)
+          setTimeout(() => {
+            if (isConversationalModeRef.current && voiceStateRef.current === 'listening') {
+              startRecognitionSafely();
+            } else if (!isConversationalModeRef.current) {
+              startRecognitionSafely();
+            }
+          }, 1000);
         }
       };
 
       recognitionRef.current = rec;
     }
+  }, []);
+
+  // Background Wake Word listener trigger on mount
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      if (!isConversationalModeRef.current) {
+        startRecognitionSafely();
+      }
+    }, 1500);
+    return () => clearTimeout(timer);
   }, []);
 
   const toggleListening = () => {
@@ -234,6 +280,10 @@ const AiAssistant = () => {
         recognitionRef.current.stop();
       } catch (e) {}
     }
+    // Restart background wake-word listening
+    setTimeout(() => {
+      startRecognitionSafely();
+    }, 500);
   };
 
   const token = localStorage.getItem('lifetrack_token');
@@ -905,7 +955,7 @@ const AiAssistant = () => {
               type="text"
               value={inputText}
               onChange={(e) => setInputText(e.target.value)}
-              placeholder="Ask me a question or command..."
+              placeholder='Ask me a question or say "Hey Atlas"...'
               style={{
                 flex: 1,
                 padding: '0.8rem 1.1rem',
