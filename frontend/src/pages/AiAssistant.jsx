@@ -259,6 +259,7 @@ const AiAssistant = () => {
         body: JSON.stringify({ 
           message: text, 
           clientDate, 
+          clientTime: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false }),
           timezoneOffset: new Date().getTimezoneOffset() 
         })
       });
@@ -326,6 +327,7 @@ const AiAssistant = () => {
         body: JSON.stringify({ 
           message: text, 
           clientDate, 
+          clientTime: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false }),
           timezoneOffset: new Date().getTimezoneOffset() 
         })
       });
