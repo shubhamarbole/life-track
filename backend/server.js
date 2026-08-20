@@ -5,6 +5,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import connectDB from './config/db.js';
 import { logger } from './utils/logger.js';
+import { connectMQTT } from './utils/mqtt.js';
 
 // Import Routes
 import authRoutes from './routes/auth.js';
@@ -25,6 +26,9 @@ logger.info(`Loaded GEMINI_API_KEY: ${process.env.GEMINI_API_KEY ? 'Yes' : 'No'}
 
 // Connect to Database
 connectDB();
+
+// Connect to MQTT Broker
+connectMQTT();
 
 const app = express();
 

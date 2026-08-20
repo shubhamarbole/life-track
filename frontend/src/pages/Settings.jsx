@@ -839,6 +839,54 @@ const Settings = ({ user, onLogout, triggerReloadUser }) => {
         </div>
       )}
 
+      {/* 2.8 MQTT Telemetry Sync Card */}
+      <div className="card" style={{ borderLeft: '4px solid #ff9500' }}>
+        <h3 style={{ fontSize: '1.1rem', fontWeight: 700, marginBottom: '0.5rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+          <Compass size={20} style={{ color: '#ff9500' }} />
+          Smartwatch / IoT MQTT Sync (Telemetry)
+        </h3>
+        <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginBottom: '1.25rem' }}>
+          Synchronize steps, geofence check-ins, or subscribe to real-time AI Agent replies using the lightweight <strong>MQTT</strong> machine-to-machine protocol.
+        </p>
+
+        <div style={{ backgroundColor: 'var(--bg-tertiary)', padding: '1rem', borderRadius: 'var(--radius-md)', fontSize: '0.8rem', border: '1px solid var(--border)', display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--border)', paddingBottom: '0.5rem' }}>
+            <span style={{ fontWeight: 650, color: 'var(--text-primary)' }}>MQTT Broker:</span>
+            <span style={{ color: '#ff9500', fontFamily: 'monospace', fontWeight: 700 }}>broker.hivemq.com (Port 1883)</span>
+          </div>
+
+          <div>
+            <div style={{ fontWeight: 700, color: 'var(--text-primary)', marginBottom: '0.25rem' }}>📤 1. Publish Steps / Geofence Activity:</div>
+            <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginBottom: '0.35rem' }}>
+              Publish a JSON payload to this topic to synchronize your sensor steps:
+            </div>
+            <div style={{ backgroundColor: '#0f172a', padding: '0.5rem', borderRadius: '6px', color: '#38bdf8', fontSize: '0.75rem', fontFamily: 'monospace', overflowX: 'auto', marginBottom: '0.5rem' }}>
+              lifetrack/{user?._id}/activity/update
+            </div>
+            <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', fontWeight: 600, marginBottom: '0.25rem' }}>Payload Template:</div>
+            <pre style={{ margin: 0, backgroundColor: '#0f172a', padding: '0.5rem', borderRadius: '6px', color: '#cbd5e1', fontSize: '0.7rem', overflowX: 'auto' }}>
+{`{
+  "steps": 8500,
+  "walkingDistance": 5.2,
+  "walkingDuration": 45,
+  "activityType": "Manual Sync",
+  "date": "${todayStr}"
+}`}
+            </pre>
+          </div>
+
+          <div style={{ borderTop: '1px solid var(--border)', paddingTop: '0.75rem', marginTop: '0.25rem' }}>
+            <div style={{ fontWeight: 700, color: 'var(--text-primary)', marginBottom: '0.25rem' }}>📥 2. Subscribe to AI Agent Events:</div>
+            <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginBottom: '0.35rem' }}>
+              Subscribe to this topic to listen to real-time AI Agent replies and automation confirmations:
+            </div>
+            <div style={{ backgroundColor: '#0f172a', padding: '0.5rem', borderRadius: '6px', color: '#4ade80', fontSize: '0.75rem', fontFamily: 'monospace', overflowX: 'auto' }}>
+              lifetrack/{user?._id}/events
+            </div>
+          </div>
+        </div>
+      </div>
+
       {/* 2.75 Excel/CSV Exporter */}
       <div className="card">
         <h3 style={{ fontSize: '1.1rem', fontWeight: 700, marginBottom: '0.5rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>

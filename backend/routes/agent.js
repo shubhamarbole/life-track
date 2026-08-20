@@ -5,6 +5,7 @@ import OfficeAttendance from '../models/OfficeAttendance.js';
 import WorkSession from '../models/WorkSession.js';
 import AgentActivity from '../models/AgentActivity.js';
 import { protect } from '../middleware/auth.js';
+import { publishAgentEvent } from '../utils/mqtt.js';
 
 const router = express.Router();
 
@@ -392,6 +393,9 @@ Your tasks:
         aiResponse.reply += `\n\n*(Error performing action: ${dbErr.message})*`;
       }
     }
+
+    // Publish agent response/action events to MQTT broker
+    publishAgentEvent(userId, actionExecuted ? 'agent_action' : 'agent_reply', actionExecuted ? actionDetails : aiResponse.reply);
 
     res.json({
       reply: aiResponse.reply,
