@@ -225,6 +225,22 @@ const AiAssistant = () => {
     return () => clearTimeout(timer);
   }, []);
 
+  // Handle start voice trigger from search parameters (e.g. redirected from Dashboard)
+  useEffect(() => {
+    const queryParams = new URLSearchParams(window.location.search);
+    if (queryParams.get('voice') === 'start') {
+      // Clear URL parameter so reload doesn't trigger it again
+      window.history.replaceState({}, document.title, window.location.pathname);
+      
+      setIsConversationalMode(true);
+      setVoiceState('speaking');
+      window.speechSynthesis.cancel();
+      setTimeout(() => {
+        speakText("Yes, I'm here. How can I help you today?");
+      }, 500);
+    }
+  }, []);
+
   const toggleListening = () => {
     if (!recognitionRef.current) {
       alert("Voice recognition is not supported in this browser. Please try Google Chrome or Safari!");

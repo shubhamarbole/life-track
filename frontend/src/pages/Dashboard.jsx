@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { 
   Building, 
   MapPin, 
@@ -48,6 +48,85 @@ const Dashboard = ({ user, triggerReloadUser }) => {
       setWorkSummaryText('');
     }
   }, [attendance]);
+
+  const navigate = useNavigate();
+  const recognitionRef = useRef(null);
+
+  const playChime = () => {
+    try {
+      const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      const osc1 = audioCtx.createOscillator();
+      const osc2 = audioCtx.createOscillator();
+      const gainNode = audioCtx.createGain();
+
+      osc1.connect(gainNode);
+      osc2.connect(gainNode);
+      gainNode.connect(audioCtx.destination);
+
+      gainNode.gain.setValueAtTime(0, audioCtx.currentTime);
+      gainNode.gain.linearRampToValueAtTime(0.2, audioCtx.currentTime + 0.05);
+      gainNode.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + 0.4);
+
+      osc1.frequency.setValueAtTime(523.25, audioCtx.currentTime); // C5
+      osc1.frequency.setValueAtTime(659.25, audioCtx.currentTime + 0.12); // E5
+      osc2.frequency.setValueAtTime(783.99, audioCtx.currentTime + 0.12); // G5
+
+      osc1.start();
+      osc2.start(audioCtx.currentTime + 0.12);
+      osc1.stop(audioCtx.currentTime + 0.4);
+      osc2.stop(audioCtx.currentTime + 0.4);
+    } catch (err) {
+      console.error("Failed to play activation chime:", err);
+    }
+  };
+
+  useEffect(() => {
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SpeechRecognition) return;
+
+    const rec = new SpeechRecognition();
+    rec.continuous = false;
+    rec.interimResults = false;
+    rec.lang = 'en-US';
+
+    let isComponentMounted = true;
+
+    rec.onend = () => {
+      if (isComponentMounted) {
+        try {
+          rec.start();
+        } catch (e) {}
+      }
+    };
+
+    rec.onresult = (event) => {
+      const transcript = event.results[0][0].transcript.toLowerCase();
+      if (transcript.includes('hey atlas') || transcript.includes('hey, atlas') || transcript.includes('hello atlas') || transcript.includes('atlas') || transcript.includes('ok atlas')) {
+        playChime();
+        navigate('/assistant?voice=start');
+      }
+    };
+
+    rec.onerror = (e) => {
+      // Silence background console noise
+    };
+
+    recognitionRef.current = rec;
+
+    const startTimer = setTimeout(() => {
+      try {
+        rec.start();
+      } catch (e) {}
+    }, 1500);
+
+    return () => {
+      isComponentMounted = false;
+      clearTimeout(startTimer);
+      try {
+        rec.stop();
+      } catch (e) {}
+    };
+  }, [navigate]);
 
   const token = localStorage.getItem('lifetrack_token');
   const todayStr = new Date().toISOString().split('T')[0];
