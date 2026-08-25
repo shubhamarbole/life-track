@@ -26,6 +26,22 @@ const formatDuration = (ms) => {
   return remMins > 0 ? `${hrs}h ${remMins}m` : `${hrs}h`;
 };
 
+// Helper to format UTC Date to user local time string independently of server timezone
+const getLocalTimeString = (utcDate, offsetMins) => {
+  if (!utcDate) return 'None';
+  const dateObj = new Date(utcDate);
+  if (isNaN(dateObj.getTime())) return 'None';
+  if (offsetMins !== undefined && offsetMins !== null) {
+    dateObj.setMinutes(dateObj.getMinutes() - parseInt(offsetMins));
+  }
+  return dateObj.toLocaleTimeString('en-US', {
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: true,
+    timeZone: 'UTC'
+  });
+};
+
 // @desc    Process chat message with AI Agent
 // @route   POST /api/agent/chat
 // @access  Private
@@ -54,7 +70,7 @@ router.post('/chat', protect, async (req, res) => {
 
     if (geminiKey) {
       try {
-        const clientTime = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+        const clientTime = getLocalTimeString(new Date(), timezoneOffset);
         const systemPrompt = `You are 'DayTrack AI', a helpful, personal daily tracking companion.
 You analyze the user's daily habits, expenses, office hours, work productivity, and movement step count to provide coaching, answer questions, and perform actions.
 
@@ -65,8 +81,8 @@ Current Time: ${clientTime}
 User Tracking History (Last 30 Days):
 - Expenses: ${JSON.stringify(expenses.map(e => ({ amount: e.amount, category: e.category, note: e.note, date: e.date })))}
 - Daily Movement & Steps: ${JSON.stringify(activities.map(a => ({ steps: a.steps, distance: a.walkingDistance, date: a.date })))}
-- Office Attendance Logs: ${JSON.stringify(attendance.map(att => ({ arrival: att.arrivalTime, departure: att.departureTime, duration: att.officeDuration, date: att.date })))}
-- Work Productivity Sessions: ${JSON.stringify(workSessions.map(w => ({ category: w.category, duration: w.duration, startTime: w.startTime, endTime: w.endTime, date: w.date })))}
+- Office Attendance Logs: ${JSON.stringify(attendance.map(att => ({ arrival: getLocalTimeString(att.arrivalTime, timezoneOffset), departure: getLocalTimeString(att.departureTime, timezoneOffset), duration: att.officeDuration, date: att.date })))}
+- Work Productivity Sessions: ${JSON.stringify(workSessions.map(w => ({ category: w.category, duration: w.duration, startTime: getLocalTimeString(w.startTime, timezoneOffset), endTime: getLocalTimeString(w.endTime, timezoneOffset), date: w.date })))}
 
 Your tasks:
 1. Provide concise, encouraging, and friendly answers to the user's questions about their logs, history, productivity, or spendings.
@@ -419,7 +435,7 @@ Your tasks:
 // @route   GET /api/agent/summary
 // @access  Private
 router.get('/summary', protect, async (req, res) => {
-  const { date } = req.query;
+  const { date, timezoneOffset } = req.query;
   const userId = req.user._id;
   const todayStr = date || new Date().toISOString().split('T')[0];
 
@@ -444,10 +460,10 @@ router.get('/summary', protect, async (req, res) => {
         const prompt = `You are a personal AI coach. Analyze the user's tracking metrics for today (${todayStr}) and summarize their day.
 Metrics:
 - Steps: ${stepsCount} (distance: ${activity?.walkingDistance || 0} km)
-- Office check-in: ${attendance?.arrivalTime ? new Date(attendance.arrivalTime).toLocaleTimeString([], {hour: '2-digit', minute: '2-digit'}) : 'None'}
-- Office check-out: ${attendance?.departureTime ? new Date(attendance.departureTime).toLocaleTimeString([], {hour: '2-digit', minute: '2-digit'}) : 'None'}
+- Office check-in: ${getLocalTimeString(attendance?.arrivalTime, timezoneOffset)}
+- Office check-out: ${getLocalTimeString(attendance?.departureTime, timezoneOffset)}
 - Office presence duration: ${attendance?.officeDuration ? (attendance.officeDuration / 3600000).toFixed(1) : 0} hours
-- Work timers: ${JSON.stringify(workSessions.map(w => ({ category: w.category, duration: w.duration })))}
+- Work timers: ${JSON.stringify(workSessions.map(w => ({ category: w.category, duration: w.duration, startTime: getLocalTimeString(w.startTime, timezoneOffset), endTime: getLocalTimeString(w.endTime, timezoneOffset) })))}
 - Money spent: ₹${spendingAmt} (Expenses: ${JSON.stringify(expenses.map(e => ({ amount: e.amount, category: e.category, note: e.note })))})
 
 Write a brief (max 3 sentences) summary of their day's activities. Then suggest 2 short bullet points of coaching insights or wellness tips based on these numbers.

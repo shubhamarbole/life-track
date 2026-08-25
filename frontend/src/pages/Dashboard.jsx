@@ -171,7 +171,7 @@ const Dashboard = ({ user, triggerReloadUser }) => {
   const fetchAiSummary = async () => {
     try {
       setLoadingAiSummary(true);
-      const res = await fetch(`/api/agent/summary?date=${todayStr}`, {
+      const res = await fetch(`/api/agent/summary?date=${todayStr}&timezoneOffset=${new Date().getTimezoneOffset()}`, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
       if (res.ok) {
