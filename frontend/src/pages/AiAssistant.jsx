@@ -511,7 +511,11 @@ const AiAssistant = () => {
         // 3. Play Text-to-Speech response if not muted
         if (!isMutedRef.current) {
           setVoiceState('speaking');
-          speakText(data.reply);
+          let textToSpeak = data.reply;
+          if (textToSpeak.includes("I am running in local offline mode")) {
+            textToSpeak = "Running in local offline mode. Please configure your Gemini API key.";
+          }
+          speakText(textToSpeak);
         } else {
           setVoiceState('listening');
           startRecognitionSafely();
