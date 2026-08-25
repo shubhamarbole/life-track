@@ -127,20 +127,6 @@ Your tasks:
               responseMimeType: 'application/json'
             }
           })
-        const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent?key=${geminiKey}`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            contents: [
-              { parts: [{ text: `User message: ${message}` }] }
-            ],
-            systemInstruction: {
-              parts: [{ text: systemPrompt }]
-            },
-            generationConfig: {
-              responseMimeType: 'application/json'
-            }
-          })
         });
 
         const geminiData = await response.json();
