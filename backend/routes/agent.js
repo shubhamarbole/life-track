@@ -69,6 +69,8 @@ router.post('/chat', protect, async (req, res) => {
 
     const geminiKey = process.env.GEMINI_API_KEY;
     let aiResponse = null;
+    let requestFailed = false;
+    let rateLimited = false;
 
     if (geminiKey) {
       try {
@@ -125,6 +127,20 @@ Your tasks:
               responseMimeType: 'application/json'
             }
           })
+        const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent?key=${geminiKey}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            contents: [
+              { parts: [{ text: `User message: ${message}` }] }
+            ],
+            systemInstruction: {
+              parts: [{ text: systemPrompt }]
+            },
+            generationConfig: {
+              responseMimeType: 'application/json'
+            }
+          })
         });
 
         const geminiData = await response.json();
@@ -139,16 +155,27 @@ Your tasks:
           }
         } else {
           console.error('Gemini API Error:', geminiData);
+          requestFailed = true;
+          if (response.status === 429) {
+            rateLimited = true;
+          }
         }
       } catch (geminiErr) {
         console.error('Gemini sync call error:', geminiErr);
+        requestFailed = true;
       }
     }
 
     // 2. Rule-based Fallback Parser (if Gemini key is missing or call failed)
     if (!aiResponse) {
+      let fallbackText = "I am running in local offline mode. To enable smart AI responses, please configure `GEMINI_API_KEY` in the `backend/.env` file. However, I can still parse basic command patterns!";
+      if (geminiKey && requestFailed) {
+        fallbackText = rateLimited 
+          ? "I am currently rate-limited by the Gemini AI quota. Please wait a few seconds and try again." 
+          : "I encountered an issue connecting to the Gemini AI service. Please verify your internet connection and try again in a few seconds.";
+      }
       aiResponse = {
-        reply: "I am running in local offline mode. To enable smart AI responses, please configure `GEMINI_API_KEY` in the `backend/.env` file. However, I can still parse basic command patterns!",
+        reply: fallbackText,
         action: null
       };
 

@@ -5,6 +5,7 @@ import Expense from '../models/Expense.js';
 import DailyActivity from '../models/DailyActivity.js';
 import OfficeAttendance from '../models/OfficeAttendance.js';
 import WorkSession from '../models/WorkSession.js';
+import Holiday from '../models/Holiday.js';
 
 dotenv.config({ path: '.env' });
 
@@ -23,17 +24,22 @@ async function run() {
     }
 
     const userId = user._id;
-    const message = "Hi, how are you?";
-    const todayStr = new Date().toISOString().split('T')[0];
+    const messages = [
+      "put ultrasound 21 22 23 24",
+      "holidays on 21 22 23 24",
+      "what's time I checked"
+    ];
 
+    const todayStr = new Date().toISOString().split('T')[0];
     const startDate = new Date();
     startDate.setDate(startDate.getDate() - 30);
 
-    const [expenses, activities, attendance, workSessions] = await Promise.all([
+    const [expenses, activities, attendance, workSessions, holidays] = await Promise.all([
       Expense.find({ userId, date: { $gte: startDate } }).sort({ date: -1 }),
       DailyActivity.find({ userId, date: { $gte: startDate } }).sort({ date: -1 }),
       OfficeAttendance.find({ userId, date: { $gte: startDate } }).sort({ date: -1 }),
-      WorkSession.find({ userId, date: { $gte: startDate } }).sort({ date: -1 })
+      WorkSession.find({ userId, date: { $gte: startDate } }).sort({ date: -1 }),
+      Holiday.find({ userId }).sort({ date: -1 })
     ]);
 
     const clientTime = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
@@ -49,6 +55,7 @@ User Tracking History (Last 30 Days):
 - Daily Movement & Steps: ${JSON.stringify(activities.map(a => ({ steps: a.steps, distance: a.walkingDistance, date: a.date })))}
 - Office Attendance Logs: ${JSON.stringify(attendance.map(att => ({ arrival: att.arrivalTime, departure: att.departureTime, duration: att.officeDuration, date: att.date })))}
 - Work Productivity Sessions: ${JSON.stringify(workSessions.map(w => ({ category: w.category, duration: w.duration, startTime: w.startTime, endTime: w.endTime, date: w.date })))}
+- Holiday Calendar: ${JSON.stringify(holidays.map(h => ({ name: h.name, date: h.date, type: h.type })))}
 
 Your tasks:
 1. Provide concise, encouraging, and friendly answers to the user's questions about their logs, history, productivity, or spendings.
@@ -61,41 +68,56 @@ Your tasks:
    - START_WORK: { category: 'Coding' | 'Learning' | 'Meeting' | 'Other' (required) }
    - STOP_WORK: {}
    - UPDATE_WORK_SUMMARY: { summary: String (required), date: String (optional, YYYY-MM-DD, defaults to today: ${todayStr}) }
+   - CREATE_HOLIDAY: { date: String (required, format YYYY-MM-DD), name: String (required), type: 'Public' | 'Personal' (optional) }
 
 4. Response Format:
    You MUST return a JSON object conforming exactly to this schema:
    {
      "reply": "Your conversational response in markdown formatting. If you are triggerring an action, explicitly confirm what action you have prepared.",
      "action": null | {
-       "type": "CREATE_EXPENSE" | "UPDATE_STEPS" | "CHECK_IN" | "CHECK_OUT" | "START_WORK" | "STOP_WORK" | "UPDATE_WORK_SUMMARY",
+       "type": "CREATE_EXPENSE" | "UPDATE_STEPS" | "CHECK_IN" | "CHECK_OUT" | "START_WORK" | "STOP_WORK" | "UPDATE_WORK_SUMMARY" | "CREATE_HOLIDAY",
        "payload": object
      }
    }
 `;
 
-    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent?key=${geminiKey}`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        contents: [
-          { parts: [{ text: `User message: ${message}` }] }
-        ],
-        systemInstruction: {
-          parts: [{ text: systemPrompt }]
-        },
-        generationConfig: {
-          responseMimeType: 'application/json'
-        }
-      })
-    });
+    for (const message of messages) {
+      console.log(`\n=================== TESTING QUERY: "${message}" ===================`);
+      const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${geminiKey}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents: [
+            { parts: [{ text: `User message: ${message}` }] }
+          ],
+          systemInstruction: {
+            parts: [{ text: systemPrompt }]
+          },
+          generationConfig: {
+            responseMimeType: 'application/json'
+          }
+        })
+      });
 
-    const status = response.status;
-    const data = await response.json();
-    console.log("Fetch Status:", status);
-    if (response.ok) {
-      console.log("Data candidates text:", data.candidates?.[0]?.content?.parts?.[0]?.text);
-    } else {
-      console.error("Error data:", JSON.stringify(data, null, 2));
+      const status = response.status;
+      const data = await response.json();
+      console.log("Fetch Status:", status);
+      if (response.ok) {
+        const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
+        console.log("Raw Response Text:\n", text);
+        try {
+          let cleanText = text.trim();
+          if (cleanText.startsWith('```')) {
+            cleanText = cleanText.replace(/^```(?:json)?\n?/i, '').replace(/\n?```$/, '').trim();
+          }
+          const parsed = JSON.parse(cleanText);
+          console.log("SUCCESSFULLY PARSED JSON:", JSON.stringify(parsed, null, 2));
+        } catch (e) {
+          console.error("JSON PARSE ERROR:", e.message);
+        }
+      } else {
+        console.error("Error data:", JSON.stringify(data, null, 2));
+      }
     }
 
   } catch (err) {
