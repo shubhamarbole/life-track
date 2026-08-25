@@ -39,6 +39,7 @@ const AiAssistant = () => {
   const [isListening, setIsListening] = useState(false);
   const activeUtteranceRef = useRef(null);
   const recognitionRef = useRef(null);
+  const backupSpeechTimerRef = useRef(null);
 
   // Strip markdown formatting and translate symbols for natural Speech Synthesis
   const stripMarkdown = (text) => {
@@ -101,6 +102,10 @@ const AiAssistant = () => {
   // Text-To-Speech Narration
   const speakText = (text) => {
     window.speechSynthesis.cancel(); // Stop active speaking
+    if (backupSpeechTimerRef.current) {
+      clearTimeout(backupSpeechTimerRef.current);
+      backupSpeechTimerRef.current = null;
+    }
 
     const cleanedText = stripMarkdown(text);
     if (!cleanedText) {
@@ -136,10 +141,11 @@ const AiAssistant = () => {
     const wordCount = cleanedText.split(/\s+/).length;
     const estimatedTimeMs = (wordCount / 2.5) * 1000 + 3500;
 
-    let backupTimer = null;
-
     const cleanupAndListen = () => {
-      if (backupTimer) clearTimeout(backupTimer);
+      if (backupSpeechTimerRef.current) {
+        clearTimeout(backupSpeechTimerRef.current);
+        backupSpeechTimerRef.current = null;
+      }
       activeUtteranceRef.current = null;
       if (isConversationalModeRef.current) {
         setVoiceState('listening');
@@ -157,7 +163,7 @@ const AiAssistant = () => {
     };
 
     // Set backup recovery timer in case browser fails to fire onend event
-    backupTimer = setTimeout(() => {
+    backupSpeechTimerRef.current = setTimeout(() => {
       if (isConversationalModeRef.current && voiceStateRef.current === 'speaking') {
         console.warn("Speech Synthesis 'onend' timed out! Force returning to listening state.");
         window.speechSynthesis.cancel();
@@ -303,6 +309,10 @@ const AiAssistant = () => {
 
   const handleInterruptSpeech = () => {
     window.speechSynthesis.cancel();
+    if (backupSpeechTimerRef.current) {
+      clearTimeout(backupSpeechTimerRef.current);
+      backupSpeechTimerRef.current = null;
+    }
     if (isConversationalMode) {
       setVoiceState('listening');
       startRecognitionSafely();
@@ -314,6 +324,10 @@ const AiAssistant = () => {
     setIsMuted(nextMuted);
     if (nextMuted) {
       window.speechSynthesis.cancel();
+      if (backupSpeechTimerRef.current) {
+        clearTimeout(backupSpeechTimerRef.current);
+        backupSpeechTimerRef.current = null;
+      }
       if (voiceState === 'speaking') {
         setVoiceState('listening');
         startRecognitionSafely();
@@ -329,6 +343,10 @@ const AiAssistant = () => {
     setIsConversationalMode(true);
     setVoiceState('listening');
     window.speechSynthesis.cancel();
+    if (backupSpeechTimerRef.current) {
+      clearTimeout(backupSpeechTimerRef.current);
+      backupSpeechTimerRef.current = null;
+    }
     setTimeout(() => {
       startRecognitionSafely();
     }, 200);
@@ -338,6 +356,10 @@ const AiAssistant = () => {
     setIsConversationalMode(false);
     setVoiceState('idle');
     window.speechSynthesis.cancel();
+    if (backupSpeechTimerRef.current) {
+      clearTimeout(backupSpeechTimerRef.current);
+      backupSpeechTimerRef.current = null;
+    }
     if (recognitionRef.current) {
       try {
         recognitionRef.current.stop();
