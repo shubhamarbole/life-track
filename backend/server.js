@@ -16,6 +16,7 @@ import workRoutes from './routes/work.js';
 import googleFitRoutes from './routes/googleFit.js';
 import gmailRoutes from './routes/gmail.js';
 import agentRoutes from './routes/agent.js';
+import holidayRoutes from './routes/holiday.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -62,6 +63,7 @@ app.use('/api/work', workRoutes);
 app.use('/api/auth/google', googleFitRoutes);
 app.use('/api/gmail', gmailRoutes);
 app.use('/api/agent', agentRoutes);
+app.use('/api/holiday', holidayRoutes);
 
 // Serve frontend static build files in production
 if (process.env.NODE_ENV === 'production') {

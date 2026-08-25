@@ -4,6 +4,7 @@ import DailyActivity from '../models/DailyActivity.js';
 import OfficeAttendance from '../models/OfficeAttendance.js';
 import WorkSession from '../models/WorkSession.js';
 import AgentActivity from '../models/AgentActivity.js';
+import Holiday from '../models/Holiday.js';
 import { protect } from '../middleware/auth.js';
 import { publishAgentEvent } from '../utils/mqtt.js';
 
@@ -58,11 +59,12 @@ router.post('/chat', protect, async (req, res) => {
 
   try {
     // 1. Fetch user data context (last 30 days)
-    const [expenses, activities, attendance, workSessions] = await Promise.all([
+    const [expenses, activities, attendance, workSessions, holidays] = await Promise.all([
       Expense.find({ userId, date: { $gte: startDate } }).sort({ date: -1 }),
       DailyActivity.find({ userId, date: { $gte: startDate } }).sort({ date: -1 }),
       OfficeAttendance.find({ userId, date: { $gte: startDate } }).sort({ date: -1 }),
-      WorkSession.find({ userId, date: { $gte: startDate } }).sort({ date: -1 })
+      WorkSession.find({ userId, date: { $gte: startDate } }).sort({ date: -1 }),
+      Holiday.find({ userId }).sort({ date: -1 })
     ]);
 
     const geminiKey = process.env.GEMINI_API_KEY;
@@ -83,6 +85,7 @@ User Tracking History (Last 30 Days):
 - Daily Movement & Steps: ${JSON.stringify(activities.map(a => ({ steps: a.steps, distance: a.walkingDistance, date: a.date })))}
 - Office Attendance Logs: ${JSON.stringify(attendance.map(att => ({ arrival: getLocalTimeString(att.arrivalTime, timezoneOffset), departure: getLocalTimeString(att.departureTime, timezoneOffset), duration: att.officeDuration, date: att.date })))}
 - Work Productivity Sessions: ${JSON.stringify(workSessions.map(w => ({ category: w.category, duration: w.duration, startTime: getLocalTimeString(w.startTime, timezoneOffset), endTime: getLocalTimeString(w.endTime, timezoneOffset), date: w.date })))}
+- Holiday Calendar: ${JSON.stringify(holidays.map(h => ({ name: h.name, date: h.date, type: h.type })))}
 
 Your tasks:
 1. Provide concise, encouraging, and friendly answers to the user's questions about their logs, history, productivity, or spendings.
@@ -95,13 +98,14 @@ Your tasks:
    - START_WORK: { category: 'Coding' | 'Learning' | 'Meeting' | 'Other' (required) }
    - STOP_WORK: {}
    - UPDATE_WORK_SUMMARY: { summary: String (required), date: String (optional, YYYY-MM-DD, defaults to today: ${todayStr}) }
+   - CREATE_HOLIDAY: { date: String (required, format YYYY-MM-DD), name: String (required), type: 'Public' | 'Personal' (optional) }
 
 4. Response Format:
    You MUST return a JSON object conforming exactly to this schema:
    {
      "reply": "Your conversational response in markdown formatting. If you are triggerring an action, explicitly confirm what action you have prepared.",
      "action": null | {
-       "type": "CREATE_EXPENSE" | "UPDATE_STEPS" | "CHECK_IN" | "CHECK_OUT" | "START_WORK" | "STOP_WORK" | "UPDATE_WORK_SUMMARY",
+       "type": "CREATE_EXPENSE" | "UPDATE_STEPS" | "CHECK_IN" | "CHECK_OUT" | "START_WORK" | "STOP_WORK" | "UPDATE_WORK_SUMMARY" | "CREATE_HOLIDAY",
        "payload": object
      }
    }
@@ -400,6 +404,27 @@ Your tasks:
           await att.save();
           actionExecuted = true;
           actionDetails = `Updated work summary note to "${summary}" for ${targetDate === todayStr ? 'today' : 'yesterday'} (${targetDate})`;
+        }
+        else if (type === 'CREATE_HOLIDAY') {
+          const { date, name, type: hType } = payload;
+          const targetDate = date || todayStr;
+          
+          let holiday = await Holiday.findOne({ userId, date: targetDate });
+          if (holiday) {
+            holiday.name = name;
+            holiday.type = hType || holiday.type;
+            await holiday.save();
+            actionDetails = `Updated holiday on ${targetDate} to "${name}"`;
+          } else {
+            await Holiday.create({
+              userId,
+              date: targetDate,
+              name,
+              type: hType || 'Public'
+            });
+            actionDetails = `Logged new holiday on ${targetDate}: "${name}"`;
+          }
+          actionExecuted = true;
         }
 
         // Record agent action log

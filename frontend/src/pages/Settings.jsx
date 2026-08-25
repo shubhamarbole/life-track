@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { MapPin, ShieldAlert, Award, Compass, RefreshCw, Trash2, HelpCircle, Terminal } from 'lucide-react';
+import { MapPin, ShieldAlert, Award, Compass, RefreshCw, Trash2, HelpCircle, Terminal, Calendar } from 'lucide-react';
 import { 
   isNativeApp, 
   requestHealthAuth, 
@@ -32,6 +32,15 @@ const Settings = ({ user, onLogout, triggerReloadUser }) => {
   const [nativeSyncStatus, setNativeSyncStatus] = useState('');
   const [hasNativeAuth, setHasNativeAuth] = useState(false);
   const [copiedToken, setCopiedToken] = useState(false);
+
+  // Holiday states
+  const [holidays, setHolidays] = useState([]);
+  const [holidayDate, setHolidayDate] = useState('');
+  const [holidayName, setHolidayName] = useState('');
+  const [holidayType, setHolidayType] = useState('Public');
+  const [holidayLoading, setHolidayLoading] = useState(false);
+  const [holidayError, setHolidayError] = useState('');
+  const [holidaySuccess, setHolidaySuccess] = useState('');
 
   useEffect(() => {
     if (isNativeApp()) {
@@ -74,8 +83,23 @@ const Settings = ({ user, onLogout, triggerReloadUser }) => {
     }
   };
 
+  const fetchHolidays = async () => {
+    try {
+      const res = await fetch('/api/holiday', {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setHolidays(data);
+      }
+    } catch (err) {
+      console.error('Error fetching holidays:', err);
+    }
+  };
+
   useEffect(() => {
     fetchLogs();
+    fetchHolidays();
   }, []);
 
   useEffect(() => {
@@ -587,6 +611,59 @@ const Settings = ({ user, onLogout, triggerReloadUser }) => {
     }
   };
 
+  const handleAddHoliday = async (e) => {
+    e.preventDefault();
+    if (!holidayDate || !holidayName) {
+      setHolidayError('Please specify date and name.');
+      return;
+    }
+    setHolidayLoading(true);
+    setHolidayError('');
+    setHolidaySuccess('');
+    try {
+      const res = await fetch('/api/holiday', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          date: holidayDate,
+          name: holidayName,
+          type: holidayType
+        })
+      });
+      if (res.ok) {
+        setHolidaySuccess('Holiday added successfully!');
+        setHolidayDate('');
+        setHolidayName('');
+        fetchHolidays();
+      } else {
+        const errData = await res.json();
+        throw new Error(errData.message || 'Failed to add holiday');
+      }
+    } catch (err) {
+      setHolidayError(err.message);
+    } finally {
+      setHolidayLoading(false);
+    }
+  };
+
+  const handleDeleteHoliday = async (id) => {
+    if (!window.confirm('Are you sure you want to delete this holiday?')) return;
+    try {
+      const res = await fetch(`/api/holiday/${id}`, {
+        method: 'DELETE',
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      if (res.ok) {
+        fetchHolidays();
+      }
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
       
@@ -991,6 +1068,116 @@ const Settings = ({ user, onLogout, triggerReloadUser }) => {
                 </div>
               );
             })}
+          </div>
+        )}
+      </div>
+
+      {/* Holiday Calendar Manager */}
+      <div className="card">
+        <h3 style={{ fontSize: '1.1rem', fontWeight: 700, marginBottom: '1.25rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+          <Calendar size={20} style={{ color: 'var(--primary)' }} />
+          Holiday Calendar
+        </h3>
+        <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginBottom: '1.25rem' }}>
+          Manage your public and personal holidays. Days marked as holidays will bypass standard attendance expectations.
+        </p>
+
+        {holidayError && <div className="alert alert-danger" style={{ marginBottom: '1rem', fontSize: '0.85rem' }}>{holidayError}</div>}
+        {holidaySuccess && <div className="alert alert-success" style={{ marginBottom: '1rem', fontSize: '0.85rem' }}>{holidaySuccess}</div>}
+
+        {/* Add Holiday Form */}
+        <form onSubmit={handleAddHoliday} style={{ display: 'flex', flexDirection: 'column', gap: '1rem', marginBottom: '1.5rem', background: 'rgba(255,255,255,0.02)', padding: '1rem', borderRadius: '8px', border: '1px solid var(--border)' }}>
+          <h4 style={{ fontSize: '0.9rem', fontWeight: 700, margin: 0 }}>Add New Holiday</h4>
+          <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap' }}>
+            <div style={{ flex: '1 1 200px' }}>
+              <label style={{ display: 'block', fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: '0.25rem' }}>Holiday Date</label>
+              <input 
+                type="date" 
+                value={holidayDate}
+                onChange={(e) => setHolidayDate(e.target.value)}
+                style={{ width: '100%', padding: '0.5rem', borderRadius: '4px', background: 'var(--bg)', border: '1px solid var(--border)', color: 'var(--text)' }}
+                required
+              />
+            </div>
+            <div style={{ flex: '2 1 300px' }}>
+              <label style={{ display: 'block', fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: '0.25rem' }}>Holiday Name</label>
+              <input 
+                type="text" 
+                placeholder="e.g. Christmas, Sick Leave"
+                value={holidayDate ? holidayName : ''}
+                onChange={(e) => setHolidayName(e.target.value)}
+                disabled={!holidayDate}
+                style={{ width: '100%', padding: '0.5rem', borderRadius: '4px', background: 'var(--bg)', border: '1px solid var(--border)', color: 'var(--text)' }}
+                required
+              />
+            </div>
+            <div style={{ flex: '1 1 150px' }}>
+              <label style={{ display: 'block', fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: '0.25rem' }}>Type</label>
+              <select
+                value={holidayType}
+                onChange={(e) => setHolidayType(e.target.value)}
+                style={{ width: '100%', padding: '0.5rem', borderRadius: '4px', background: 'var(--bg)', border: '1px solid var(--border)', color: 'var(--text)' }}
+              >
+                <option value="Public">Public</option>
+                <option value="Personal">Personal</option>
+              </select>
+            </div>
+          </div>
+          <button 
+            type="submit" 
+            className="btn btn-primary" 
+            disabled={holidayLoading}
+            style={{ alignSelf: 'flex-start', padding: '0.5rem 1.25rem', fontSize: '0.85rem' }}
+          >
+            {holidayLoading ? 'Adding...' : 'Add Holiday'}
+          </button>
+        </form>
+
+        {/* Holiday list */}
+        <h4 style={{ fontSize: '0.9rem', fontWeight: 700, marginBottom: '0.75rem' }}>Your Holidays</h4>
+        {holidays.length === 0 ? (
+          <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', fontStyle: 'italic' }}>No holidays logged yet.</p>
+        ) : (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', maxHeight: '250px', overflowY: 'auto', paddingRight: '0.25rem' }}>
+            {holidays.map(h => (
+              <div 
+                key={h._id} 
+                style={{ 
+                  display: 'flex', 
+                  justifyContent: 'space-between', 
+                  alignItems: 'center', 
+                  padding: '0.5rem 0.75rem', 
+                  background: 'rgba(255,255,255,0.01)', 
+                  borderRadius: '6px', 
+                  border: '1px solid rgba(255,255,255,0.03)',
+                  fontSize: '0.8rem'
+                }}
+              >
+                <div>
+                  <span style={{ fontWeight: 700, marginRight: '0.5rem' }}>{h.date}</span>
+                  <span style={{ color: 'var(--text-secondary)' }}>{h.name}</span>
+                  <span 
+                    style={{ 
+                      marginLeft: '0.5rem', 
+                      fontSize: '0.65rem', 
+                      padding: '0.1rem 0.4rem', 
+                      borderRadius: '10px', 
+                      background: h.type === 'Personal' ? 'rgba(192, 132, 252, 0.15)' : 'rgba(56, 189, 248, 0.15)',
+                      color: h.type === 'Personal' ? '#d8b4fe' : '#bae6fd'
+                    }}
+                  >
+                    {h.type}
+                  </span>
+                </div>
+                <button 
+                  onClick={() => handleDeleteHoliday(h._id)} 
+                  style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', padding: '0.25rem' }}
+                  title="Delete holiday"
+                >
+                  <Trash2 size={14} />
+                </button>
+              </div>
+            ))}
           </div>
         )}
       </div>
