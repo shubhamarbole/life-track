@@ -258,31 +258,62 @@ export default function LandingHero({ active, onReachEnd }) {
           DayTrack
         </div>
 
-        {/* Phase indicator pills */}
+        {/* Top-right header: Phase pills + Log In button */}
         <div
           style={{
             position: 'absolute',
-            top: 24,
+            top: 20,
             right: isMobile ? 16 : 32,
             display: 'flex',
             alignItems: 'center',
-            gap: 8,
+            gap: isMobile ? 10 : 16,
             zIndex: 60,
           }}
         >
-          {PHASES.map((p, i) => (
-            <span
-              key={p.id}
-              style={{
-                display: 'inline-block',
-                height: 4,
-                width: i === index ? 24 : 8,
-                borderRadius: 9999,
-                backgroundColor: `rgba(255, 255, 255, ${i === index ? 0.95 : 0.4})`,
-                transition: `width ${TRANSITION_MS}ms ${EASE}, background-color ${TRANSITION_MS}ms ${EASE}`,
-              }}
-            />
-          ))}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            {PHASES.map((p, i) => (
+              <span
+                key={p.id}
+                style={{
+                  display: 'inline-block',
+                  height: 4,
+                  width: i === index ? (isMobile ? 16 : 24) : 6,
+                  borderRadius: 9999,
+                  backgroundColor: `rgba(255, 255, 255, ${i === index ? 0.95 : 0.4})`,
+                  transition: `width ${TRANSITION_MS}ms ${EASE}, background-color ${TRANSITION_MS}ms ${EASE}`,
+                }}
+              />
+            ))}
+          </div>
+
+          <button
+            onClick={() => onReachEnd('login')}
+            aria-label="Log in to existing account"
+            style={{
+              padding: isMobile ? '6px 12px' : '8px 18px',
+              borderRadius: 9999,
+              border: '1.5px solid rgba(255, 255, 255, 0.85)',
+              background: 'rgba(255, 255, 255, 0.15)',
+              backdropFilter: 'blur(8px)',
+              color: '#ffffff',
+              fontSize: isMobile ? 11 : 12,
+              fontWeight: 600,
+              textTransform: 'uppercase',
+              letterSpacing: '0.12em',
+              cursor: 'pointer',
+              transition: 'background-color 150ms ease, transform 150ms ease',
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.28)';
+              e.currentTarget.style.transform = 'scale(1.04)';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.15)';
+              e.currentTarget.style.transform = 'scale(1)';
+            }}
+          >
+            Log In
+          </button>
         </div>
 
         {/* The photo cutout — with smooth real-time scroll physics & floating */}
@@ -478,3 +509,4 @@ export default function LandingHero({ active, onReachEnd }) {
     </div>
   );
 }
+

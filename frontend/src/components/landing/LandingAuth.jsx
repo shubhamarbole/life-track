@@ -14,8 +14,8 @@ const inputStyle = {
   transition: 'border-color 150ms ease',
 };
 
-export default function LandingAuth({ active, onBack, onLoginSuccess }) {
-  const [mode, setMode] = useState('signup');
+export default function LandingAuth({ active, initialMode = 'login', onBack, onLoginSuccess }) {
+  const [mode, setMode] = useState(initialMode || 'login');
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -27,6 +27,18 @@ export default function LandingAuth({ active, onBack, onLoginSuccess }) {
   const wheelAccum = useRef(0);
   const touchY = useRef(null);
   const lockRef = useRef(false);
+
+  useEffect(() => {
+    if (initialMode) setMode(initialMode);
+  }, [initialMode]);
+
+  // Load remembered email if available
+  useEffect(() => {
+    const savedEmail = localStorage.getItem('lifetrack_remembered_email');
+    if (savedEmail) {
+      setEmail(savedEmail);
+    }
+  }, []);
 
   // Scroll up (or swipe down) to leave sign up and go back to hero
   useEffect(() => {
@@ -113,6 +125,7 @@ export default function LandingAuth({ active, onBack, onLoginSuccess }) {
       if (data.token) {
         localStorage.setItem('lifetrack_token', data.token);
       }
+      localStorage.setItem('lifetrack_remembered_email', email.trim());
 
       onLoginSuccess(data);
     } catch (err) {
@@ -190,20 +203,20 @@ export default function LandingAuth({ active, onBack, onLoginSuccess }) {
               color: '#1B1F3B',
             }}
           >
-            {mode === 'signup' ? 'Begin tomorrow' : 'Welcome back'}
+            {mode === 'login' ? 'Welcome back' : 'Begin tomorrow'}
           </p>
           <p
             style={{
               fontSize: 14,
               opacity: 0.7,
               lineHeight: 1.6,
-              marginBottom: 32,
+              marginBottom: 28,
               color: '#1B1F3B',
             }}
           >
-            {mode === 'signup'
-              ? 'Create an account and DayTrack picks up right where tonight left off.'
-              : 'Log in to pick up where you left off.'}
+            {mode === 'login'
+              ? 'Log in with your existing account to access your LifeTrack dashboard.'
+              : 'Create an account and DayTrack picks up right where tonight left off.'}
           </p>
 
           <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
@@ -266,7 +279,7 @@ export default function LandingAuth({ active, onBack, onLoginSuccess }) {
               type="submit"
               disabled={submitting}
               style={{
-                marginTop: 10,
+                marginTop: 8,
                 padding: '14px 20px',
                 background: '#1B1F3B',
                 color: '#F7F3EC',
@@ -284,29 +297,45 @@ export default function LandingAuth({ active, onBack, onLoginSuccess }) {
                 transition: 'opacity 150ms ease, transform 100ms ease',
               }}
             >
-              {submitting ? 'Working…' : mode === 'signup' ? 'Create account' : 'Log in'}
+              {submitting ? 'Working…' : mode === 'login' ? 'Log in' : 'Create account'}
               {!submitting && <ArrowRight size={16} strokeWidth={2.25} />}
             </button>
           </form>
 
-          <p style={{ marginTop: 28, fontSize: 13, opacity: 0.7 }}>
-            {mode === 'signup' ? 'Already tracking? ' : 'New here? '}
-            <button
-              type="button"
-              onClick={() => switchMode(mode === 'signup' ? 'login' : 'signup')}
-              style={{
-                background: 'none',
-                border: 'none',
-                padding: 0,
-                cursor: 'pointer',
-                fontWeight: 600,
-                textDecoration: 'underline',
-                color: '#1B1F3B',
-              }}
-            >
-              {mode === 'signup' ? 'Log in' : 'Create an account'}
-            </button>
-          </p>
+          <div style={{ marginTop: 24, display: 'flex', flexDirection: 'column', gap: 10, fontSize: 13, opacity: 0.8 }}>
+            <p style={{ margin: 0 }}>
+              {mode === 'login' ? "Don't have an account? " : 'Already tracking? '}
+              <button
+                type="button"
+                onClick={() => switchMode(mode === 'login' ? 'signup' : 'login')}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  padding: 0,
+                  cursor: 'pointer',
+                  fontWeight: 600,
+                  textDecoration: 'underline',
+                  color: '#1B1F3B',
+                }}
+              >
+                {mode === 'login' ? 'Create an account' : 'Log in'}
+              </button>
+            </p>
+
+            <p style={{ margin: 0, fontSize: 12 }}>
+              Looking for the full portal?{' '}
+              <a
+                href="/login"
+                style={{
+                  fontWeight: 600,
+                  textDecoration: 'underline',
+                  color: '#1B1F3B',
+                }}
+              >
+                Open Classic Login Page
+              </a>
+            </p>
+          </div>
         </div>
       </div>
     </div>

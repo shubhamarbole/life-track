@@ -7,6 +7,12 @@ const EASE = 'cubic-bezier(0.4, 0, 0.2, 1)';
 
 export default function LandingPage({ onLoginSuccess }) {
   const [page, setPage] = useState('hero');
+  const [authMode, setAuthMode] = useState('login');
+
+  const handleOpenAuth = (mode = 'login') => {
+    setAuthMode(mode);
+    setPage('auth');
+  };
 
   const slide = page === 'auth' ? 1 : 0;
 
@@ -30,10 +36,11 @@ export default function LandingPage({ onLoginSuccess }) {
       >
         <LandingHero
           active={page === 'hero'}
-          onReachEnd={() => setPage('auth')}
+          onReachEnd={handleOpenAuth}
         />
         <LandingAuth
           active={page === 'auth'}
+          initialMode={authMode}
           onBack={() => setPage('hero')}
           onLoginSuccess={onLoginSuccess}
         />
