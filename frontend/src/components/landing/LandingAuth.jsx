@@ -17,7 +17,7 @@ const inputStyle = {
 export default function LandingAuth({ active, initialMode = 'login', onBack, onLoginSuccess }) {
   const [mode, setMode] = useState(initialMode || 'login');
   const [name, setName] = useState('');
-  const [email, setEmail] = useState('');
+  const [email, setEmail] = useState(() => localStorage.getItem('lifetrack_remembered_email') || 'shubhamarbole@gmail.com');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
@@ -341,4 +341,5 @@ export default function LandingAuth({ active, initialMode = 'login', onBack, onL
     </div>
   );
 }
+
 
