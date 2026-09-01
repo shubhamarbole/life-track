@@ -1,4 +1,4 @@
-import express from 'express';
+﻿import express from 'express';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import User from '../models/User.js';
@@ -89,6 +89,37 @@ router.post('/login', async (req, res) => {
 // @desc    Get user profile
 // @route   GET /api/auth/me
 // @access  Private
+// @desc    Reset password for account
+// @route   POST /api/auth/reset-password
+// @access  Public
+router.post('/reset-password', async (req, res) => {
+  try {
+    const { email, newPassword } = req.body;
+    if (!email || !newPassword) {
+      return res.status(400).json({ message: 'Please provide both email and new password' });
+    }
+
+    const user = await User.findOne({ email: email.toLowerCase().trim() });
+    if (!user) {
+      return res.status(404).json({ message: 'No account found with this email' });
+    }
+
+    const salt = await bcrypt.genSalt(10);
+    user.passwordHash = await bcrypt.hash(newPassword, salt);
+    await user.save();
+
+    res.json({
+      message: 'Password updated successfully! You can now log in with your new password.',
+      email: user.email,
+      token: generateToken(user._id),
+      name: user.name,
+      _id: user._id,
+    });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+});
+
 router.get('/me', protect, async (req, res) => {
   try {
     res.json(req.user);
@@ -147,3 +178,4 @@ router.delete('/delete-data', protect, async (req, res) => {
 });
 
 export default router;
+

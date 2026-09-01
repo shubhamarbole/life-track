@@ -15,12 +15,13 @@ const inputStyle = {
 };
 
 export default function LandingAuth({ active, initialMode = 'login', onBack, onLoginSuccess }) {
-  const [mode, setMode] = useState(initialMode || 'login');
+  const [mode, setMode] = useState(initialMode || 'login'); // 'login' | 'signup' | 'reset'
   const [name, setName] = useState('');
   const [email, setEmail] = useState(() => localStorage.getItem('lifetrack_remembered_email') || 'shubhamarbole@gmail.com');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
+  const [successMsg, setSuccessMsg] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
   const containerRef = useRef(null);
@@ -93,6 +94,7 @@ export default function LandingAuth({ active, initialMode = 'login', onBack, onL
   async function handleSubmit(e) {
     e.preventDefault();
     setError('');
+    setSuccessMsg('');
 
     if (!email || !password || (mode === 'signup' && !name)) {
       setError('Fill in every field to continue.');
@@ -105,10 +107,16 @@ export default function LandingAuth({ active, initialMode = 'login', onBack, onL
 
     setSubmitting(true);
     try {
-      const endpoint = mode === 'signup' ? '/api/auth/register' : '/api/auth/login';
-      const body = mode === 'signup' 
-        ? { name: name.trim(), email: email.trim(), password }
-        : { email: email.trim(), password };
+      let endpoint = '/api/auth/login';
+      let body = { email: email.trim(), password };
+
+      if (mode === 'signup') {
+        endpoint = '/api/auth/register';
+        body = { name: name.trim(), email: email.trim(), password };
+      } else if (mode === 'reset') {
+        endpoint = '/api/auth/reset-password';
+        body = { email: email.trim(), newPassword: password };
+      }
 
       const response = await fetch(endpoint, {
         method: 'POST',
@@ -119,7 +127,7 @@ export default function LandingAuth({ active, initialMode = 'login', onBack, onL
       const data = await response.json();
 
       if (!response.ok) {
-        throw new Error(data.message || (mode === 'signup' ? 'Registration failed.' : 'Login failed.'));
+        throw new Error(data.message || (mode === 'signup' ? 'Registration failed.' : 'Request failed.'));
       }
 
       if (data.token) {
@@ -127,7 +135,12 @@ export default function LandingAuth({ active, initialMode = 'login', onBack, onL
       }
       localStorage.setItem('lifetrack_remembered_email', email.trim());
 
-      onLoginSuccess(data);
+      if (mode === 'reset' && !data.token) {
+        setSuccessMsg('Password updated! You can now log in.');
+        setMode('login');
+      } else {
+        onLoginSuccess(data);
+      }
     } catch (err) {
       setError(err.message || 'Something went wrong. Please check your credentials.');
     } finally {
@@ -138,6 +151,7 @@ export default function LandingAuth({ active, initialMode = 'login', onBack, onL
   function switchMode(next) {
     setMode(next);
     setError('');
+    setSuccessMsg('');
   }
 
   return (
@@ -203,7 +217,11 @@ export default function LandingAuth({ active, initialMode = 'login', onBack, onL
               color: '#1B1F3B',
             }}
           >
-            {mode === 'login' ? 'Welcome back' : 'Begin tomorrow'}
+            {mode === 'login'
+              ? 'Welcome back'
+              : mode === 'signup'
+              ? 'Begin tomorrow'
+              : 'Reset password'}
           </p>
           <p
             style={{
@@ -216,7 +234,9 @@ export default function LandingAuth({ active, initialMode = 'login', onBack, onL
           >
             {mode === 'login'
               ? 'Log in with your existing account to access your LifeTrack dashboard.'
-              : 'Create an account and DayTrack picks up right where tonight left off.'}
+              : mode === 'signup'
+              ? 'Create an account and DayTrack picks up right where tonight left off.'
+              : 'Set a new password for your existing account.'}
           </p>
 
           <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
@@ -244,7 +264,7 @@ export default function LandingAuth({ active, initialMode = 'login', onBack, onL
               <input
                 style={{ ...inputStyle, paddingRight: 32 }}
                 type={showPassword ? 'text' : 'password'}
-                placeholder="Password"
+                placeholder={mode === 'reset' ? 'Enter new password' : 'Password'}
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 onFocus={(e) => (e.currentTarget.style.borderBottomColor = '#1B1F3B')}
@@ -275,6 +295,12 @@ export default function LandingAuth({ active, initialMode = 'login', onBack, onL
               </p>
             )}
 
+            {successMsg && (
+              <p style={{ fontSize: 13, color: '#16A34A', margin: '4px 0 0 0', fontWeight: 500 }}>
+                {successMsg}
+              </p>
+            )}
+
             <button
               type="submit"
               disabled={submitting}
@@ -297,32 +323,96 @@ export default function LandingAuth({ active, initialMode = 'login', onBack, onL
                 transition: 'opacity 150ms ease, transform 100ms ease',
               }}
             >
-              {submitting ? 'Working…' : mode === 'login' ? 'Log in' : 'Create account'}
+              {submitting
+                ? 'Working…'
+                : mode === 'login'
+                ? 'Log in'
+                : mode === 'signup'
+                ? 'Create account'
+                : 'Set Password & Enter'}
               {!submitting && <ArrowRight size={16} strokeWidth={2.25} />}
             </button>
           </form>
 
           <div style={{ marginTop: 24, display: 'flex', flexDirection: 'column', gap: 10, fontSize: 13, opacity: 0.8 }}>
-            <p style={{ margin: 0 }}>
-              {mode === 'login' ? "Don't have an account? " : 'Already tracking? '}
-              <button
-                type="button"
-                onClick={() => switchMode(mode === 'login' ? 'signup' : 'login')}
-                style={{
-                  background: 'none',
-                  border: 'none',
-                  padding: 0,
-                  cursor: 'pointer',
-                  fontWeight: 600,
-                  textDecoration: 'underline',
-                  color: '#1B1F3B',
-                }}
-              >
-                {mode === 'login' ? 'Create an account' : 'Log in'}
-              </button>
-            </p>
+            {mode === 'login' && (
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <button
+                  type="button"
+                  onClick={() => switchMode('reset')}
+                  style={{
+                    background: 'none',
+                    border: 'none',
+                    padding: 0,
+                    cursor: 'pointer',
+                    fontWeight: 600,
+                    textDecoration: 'underline',
+                    color: '#1B1F3B',
+                  }}
+                >
+                  Forgot password?
+                </button>
+                <button
+                  type="button"
+                  onClick={() => switchMode('signup')}
+                  style={{
+                    background: 'none',
+                    border: 'none',
+                    padding: 0,
+                    cursor: 'pointer',
+                    fontWeight: 600,
+                    textDecoration: 'underline',
+                    color: '#1B1F3B',
+                  }}
+                >
+                  Create an account
+                </button>
+              </div>
+            )}
 
-            <p style={{ margin: 0, fontSize: 12 }}>
+            {mode === 'signup' && (
+              <p style={{ margin: 0 }}>
+                Already tracking?{' '}
+                <button
+                  type="button"
+                  onClick={() => switchMode('login')}
+                  style={{
+                    background: 'none',
+                    border: 'none',
+                    padding: 0,
+                    cursor: 'pointer',
+                    fontWeight: 600,
+                    textDecoration: 'underline',
+                    color: '#1B1F3B',
+                  }}
+                >
+                  Log in
+                </button>
+              </p>
+            )}
+
+            {mode === 'reset' && (
+              <p style={{ margin: 0 }}>
+                Remember your password?{' '}
+                <button
+                  type="button"
+                  onClick={() => switchMode('login')}
+                  style={{
+                    background: 'none',
+                    border: 'none',
+                    padding: 0,
+                    cursor: 'pointer',
+                    fontWeight: 600,
+                    textDecoration: 'underline',
+                    color: '#1B1F3B',
+                  }}
+                >
+                  Back to Log in
+                </button>
+              </p>
+            )}
+
+            <p style={{ margin: '4px 0 0 0', fontSize: 12 }}>
               Looking for the full portal?{' '}
               <a
                 href="/login"
@@ -341,5 +431,3 @@ export default function LandingAuth({ active, initialMode = 'login', onBack, onL
     </div>
   );
 }
-
-
