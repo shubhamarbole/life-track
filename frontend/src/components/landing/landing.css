@@ -1,0 +1,96 @@
+﻿/* DayTrack Landing & Hero Design System */
+@import url('https://fonts.googleapis.com/css2?family=Anton&family=Inter:wght@300;400;500;600;700;900&display=swap');
+
+@keyframes daytrack-float {
+  0%, 100% {
+    transform: translateY(0px) rotate(0deg);
+  }
+  25% {
+    transform: translateY(-8px) rotate(0.4deg);
+  }
+  50% {
+    transform: translateY(-3px) rotate(-0.3deg);
+  }
+  75% {
+    transform: translateY(-10px) rotate(0.2deg);
+  }
+}
+
+.daytrack-floating {
+  animation: daytrack-float 5s ease-in-out infinite;
+  will-change: transform;
+}
+
+@keyframes daytrack-bounce {
+  0%, 100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(6px);
+  }
+}
+
+.daytrack-bouncing {
+  animation: daytrack-bounce 1.6s ease-in-out infinite;
+}
+
+.daytrack-grain {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 50;
+  opacity: 0.38;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.08'/%3E%3C/svg%3E");
+  background-size: 200px 200px;
+  background-repeat: repeat;
+}
+
+.daytrack-ghost-wrap {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 15%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+  user-select: none;
+  z-index: 2;
+}
+
+.daytrack-ghost-text {
+  font-family: 'Anton', sans-serif;
+  font-size: clamp(60px, 20vw, 300px);
+  font-weight: 900;
+  color: #ffffff;
+  line-height: 1;
+  text-transform: uppercase;
+  letter-spacing: -0.02em;
+  white-space: nowrap;
+}
+
+.daytrack-nav-btn {
+  width: 52px;
+  height: 52px;
+  border-radius: 9999px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #ffffff;
+  background: transparent;
+  border: 2px solid rgba(255, 255, 255, 0.9);
+  cursor: pointer;
+  transition: transform 150ms ease, background-color 150ms ease;
+}
+
+.daytrack-nav-btn:hover {
+  transform: scale(1.08);
+  background-color: rgba(255, 255, 255, 0.15);
+}
+
+@media (min-width: 640px) {
+  .daytrack-nav-btn {
+    width: 62px;
+    height: 62px;
+  }
+}

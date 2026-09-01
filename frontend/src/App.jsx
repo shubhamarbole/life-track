@@ -1,9 +1,12 @@
-import React, { useState, useEffect } from 'react';
+﻿import React, { useState, useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import BottomNav from './components/BottomNav';
 import Header from './components/Header';
 
-// Pages
+// Landing Page (DayTrack Hero + Dynamic Scroll Cutout)
+import LandingPage from './components/landing/LandingPage';
+
+// Authenticated Pages
 import Dashboard from './pages/Dashboard';
 import AiAssistant from './pages/AiAssistant';
 import History from './pages/History';
@@ -67,7 +70,22 @@ function App() {
   };
 
   if (authLoading) {
-    return <div style={{ display: 'flex', minHeight: '100vh', alignItems: 'center', justifyContent: 'center', backgroundColor: '#0f172a', color: '#fff' }}>Verifying account token...</div>;
+    return (
+      <div
+        style={{
+          display: 'flex',
+          minHeight: '100vh',
+          alignItems: 'center',
+          justifyContent: 'center',
+          backgroundColor: '#0f172a',
+          color: '#fff',
+          fontFamily: "'Inter', sans-serif",
+          fontSize: 15,
+        }}
+      >
+        Verifying account session...
+      </div>
+    );
   }
 
   return (
@@ -92,16 +110,13 @@ function App() {
             <BottomNav />
           </>
         ) : (
-          /* Unauthenticated Auth Guard */
-          <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: '100vh' }}>
-            <main style={{ flex: 1, padding: '1.5rem', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <Routes>
-                <Route path="/login" element={<Login onLoginSuccess={handleLoginSuccess} />} />
-                <Route path="/register" element={<Register onLoginSuccess={handleLoginSuccess} />} />
-                <Route path="*" element={<Navigate to="/login" replace />} />
-              </Routes>
-            </main>
-          </div>
+          /* Unauthenticated Landing Experience with Auth Integration */
+          <Routes>
+            <Route path="/" element={<LandingPage onLoginSuccess={handleLoginSuccess} />} />
+            <Route path="/login" element={<Login onLoginSuccess={handleLoginSuccess} />} />
+            <Route path="/register" element={<Register onLoginSuccess={handleLoginSuccess} />} />
+            <Route path="*" element={<Navigate to="/" replace />} />
+          </Routes>
         )}
       </div>
     </Router>
