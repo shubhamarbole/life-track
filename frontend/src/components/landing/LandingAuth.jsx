@@ -98,8 +98,8 @@ export default function LandingAuth({ active, initialMode = 'login', onBack, onL
       setError('Fill in every field to continue.');
       return;
     }
-    if (password.length < 6) {
-      setError('Password needs at least 6 characters.');
+    if (mode === 'signup' && password.length < 4) {
+      setError('Password needs at least 4 characters.');
       return;
     }
 
@@ -341,3 +341,4 @@ export default function LandingAuth({ active, initialMode = 'login', onBack, onL
     </div>
   );
 }
+
