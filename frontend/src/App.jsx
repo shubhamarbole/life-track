@@ -3,7 +3,7 @@ import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-d
 import BottomNav from './components/BottomNav';
 import Header from './components/Header';
 
-// Landing Page (DayTrack Hero + Dynamic Scroll Cutout)
+// Landing & Auth (DayTrack Hero + Animated Auth)
 import LandingPage from './components/landing/LandingPage';
 
 // Authenticated Pages
@@ -12,15 +12,11 @@ import AiAssistant from './pages/AiAssistant';
 import History from './pages/History';
 import Money from './pages/Money';
 import Settings from './pages/Settings';
-import Login from './pages/Login';
-import Register from './pages/Register';
 
 function App() {
   const [user, setUser] = useState(null);
   const theme = 'dark';
   const [authLoading, setAuthLoading] = useState(true);
-
-  const token = localStorage.getItem('lifetrack_token');
 
   // Load user profile
   const fetchUserProfile = async (customToken) => {
@@ -110,11 +106,20 @@ function App() {
             <BottomNav />
           </>
         ) : (
-          /* Unauthenticated Landing Experience with Auth Integration */
+          /* Unauthenticated Experience: DayTrack Animated Landing & Login */
           <Routes>
-            <Route path="/" element={<LandingPage onLoginSuccess={handleLoginSuccess} />} />
-            <Route path="/login" element={<Login onLoginSuccess={handleLoginSuccess} />} />
-            <Route path="/register" element={<Register onLoginSuccess={handleLoginSuccess} />} />
+            <Route
+              path="/"
+              element={<LandingPage onLoginSuccess={handleLoginSuccess} initialPage="hero" initialAuthMode="login" />}
+            />
+            <Route
+              path="/login"
+              element={<LandingPage onLoginSuccess={handleLoginSuccess} initialPage="auth" initialAuthMode="login" />}
+            />
+            <Route
+              path="/register"
+              element={<LandingPage onLoginSuccess={handleLoginSuccess} initialPage="auth" initialAuthMode="signup" />}
+            />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
         )}

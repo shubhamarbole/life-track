@@ -1,13 +1,21 @@
-﻿import React, { useState } from 'react';
+﻿import React, { useState, useEffect } from 'react';
 import LandingHero from './LandingHero';
 import LandingAuth from './LandingAuth';
 
 const TRANSITION_MS = 700;
 const EASE = 'cubic-bezier(0.4, 0, 0.2, 1)';
 
-export default function LandingPage({ onLoginSuccess }) {
-  const [page, setPage] = useState('hero');
-  const [authMode, setAuthMode] = useState('login');
+export default function LandingPage({ onLoginSuccess, initialPage = 'hero', initialAuthMode = 'login' }) {
+  const [page, setPage] = useState(initialPage);
+  const [authMode, setAuthMode] = useState(initialAuthMode);
+
+  useEffect(() => {
+    if (initialPage) setPage(initialPage);
+  }, [initialPage]);
+
+  useEffect(() => {
+    if (initialAuthMode) setAuthMode(initialAuthMode);
+  }, [initialAuthMode]);
 
   const handleOpenAuth = (mode = 'login') => {
     setAuthMode(mode);

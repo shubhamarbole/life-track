@@ -412,22 +412,11 @@ export default function LandingAuth({ active, initialMode = 'login', onBack, onL
               </p>
             )}
 
-            <p style={{ margin: '4px 0 0 0', fontSize: 12 }}>
-              Looking for the full portal?{' '}
-              <a
-                href="/login"
-                style={{
-                  fontWeight: 600,
-                  textDecoration: 'underline',
-                  color: '#1B1F3B',
-                }}
-              >
-                Open Classic Login Page
-              </a>
-            </p>
+
           </div>
         </div>
       </div>
     </div>
   );
 }
+
