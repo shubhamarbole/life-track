@@ -43,6 +43,55 @@ const getLocalTimeString = (utcDate, offsetMins) => {
   });
 };
 
+// Helper to calculate last week (past 7 days) metrics
+const getLastWeekMetrics = (todayStr, expenses, activities, attendance, workSessions, holidays) => {
+  const baseDate = new Date(todayStr);
+  const weekDates = [];
+  for (let i = 1; i <= 7; i++) {
+    const d = new Date(baseDate);
+    d.setDate(d.getDate() - i);
+    weekDates.push(d.toISOString().split('T')[0]);
+  }
+  const startWeek = weekDates[weekDates.length - 1];
+  const endWeek = weekDates[0];
+
+  const weekExpenses = expenses.filter(e => weekDates.includes(e.date));
+  const totalSpent = weekExpenses.reduce((sum, e) => sum + (e.amount || 0), 0);
+  const spentBreakdown = {};
+  weekExpenses.forEach(e => {
+    spentBreakdown[e.category] = (spentBreakdown[e.category] || 0) + e.amount;
+  });
+
+  const weekActivities = activities.filter(a => weekDates.includes(a.date));
+  const totalSteps = weekActivities.reduce((sum, a) => sum + (a.steps || 0), 0);
+  const totalDist = weekActivities.reduce((sum, a) => sum + (a.walkingDistance || 0), 0);
+  const avgSteps = Math.round(totalSteps / 7);
+
+  const weekSessions = workSessions.filter(w => weekDates.includes(w.date));
+  const totalWorkMs = weekSessions.reduce((sum, w) => sum + (w.duration || 0), 0);
+  const workBreakdown = {};
+  weekSessions.forEach(w => {
+    workBreakdown[w.category] = (workBreakdown[w.category] || 0) + (w.duration || 0);
+  });
+
+  const weekAttendance = attendance.filter(a => weekDates.includes(a.date));
+  const officeDays = weekAttendance.filter(a => a.arrivalTime).length;
+  const officeDurationMs = weekAttendance.reduce((sum, a) => sum + (a.officeDuration || 0), 0);
+
+  const weekHolidays = holidays.filter(h => weekDates.includes(h.date));
+
+  return {
+    startDate: startWeek,
+    endDate: endWeek,
+    dates: weekDates,
+    expenses: { total: totalSpent, count: weekExpenses.length, breakdown: spentBreakdown },
+    steps: { total: totalSteps, avgDaily: avgSteps, distanceKm: totalDist },
+    work: { totalMs: totalWorkMs, breakdown: workBreakdown },
+    office: { daysAttended: officeDays, totalDurationMs: officeDurationMs },
+    holidays: weekHolidays.map(h => ({ name: h.name, date: h.date, type: h.type }))
+  };
+};
+
 // @desc    Process chat message with AI Agent
 // @route   POST /api/agent/chat
 // @access  Private
@@ -67,6 +116,8 @@ router.post('/chat', protect, async (req, res) => {
       Holiday.find({ userId }).sort({ date: -1 })
     ]);
 
+    const lastWeek = getLastWeekMetrics(todayStr, expenses, activities, attendance, workSessions, holidays);
+
     const geminiKey = process.env.GEMINI_API_KEY;
     let aiResponse = null;
     let requestFailed = false;
@@ -82,6 +133,13 @@ Context about the user:
 Current Date: ${todayStr}
 Current Time: ${clientTime}
 
+Pre-computed Last Week Summary (${lastWeek.startDate} to ${lastWeek.endDate}):
+- Total Work Logged: ${formatDuration(lastWeek.work.totalMs)} (Breakdown: ${JSON.stringify(Object.fromEntries(Object.entries(lastWeek.work.breakdown).map(([k, v]) => [k, formatDuration(v)])))})
+- Total Steps Walked: ${lastWeek.steps.total.toLocaleString()} steps (Daily average: ~${lastWeek.steps.avgDaily.toLocaleString()} steps/day, ${lastWeek.steps.distanceKm.toFixed(1)} km)
+- Total Spending: ₹${lastWeek.expenses.total.toLocaleString()} (Breakdown: ${JSON.stringify(lastWeek.expenses.breakdown)})
+- Office Attendance: ${lastWeek.office.daysAttended} day(s) (${(lastWeek.office.totalDurationMs / 3600000).toFixed(1)} hours)
+- Holidays: ${JSON.stringify(lastWeek.holidays)}
+
 User Tracking History (Last 30 Days):
 - Expenses: ${JSON.stringify(expenses.map(e => ({ amount: e.amount, category: e.category, note: e.note, date: e.date })))}
 - Daily Movement & Steps: ${JSON.stringify(activities.map(a => ({ steps: a.steps, distance: a.walkingDistance, date: a.date })))}
@@ -91,8 +149,9 @@ User Tracking History (Last 30 Days):
 
 Your tasks:
 1. Provide concise, encouraging, and friendly answers to the user's questions about their logs, history, productivity, or spendings.
-2. If the user requests to record, start, stop, check-in, check-out, or modify any tracking data, you MUST return a structured action object in your JSON response. Do NOT perform any database writes yourself, just supply the action request.
-3. Available Actions:
+2. If the user asks for a summary of last week, past week, or weekly recap, use the Pre-computed Last Week Summary above to deliver an encouraging, structured review of their work hours, fitness steps, money spent in Rupees (₹), and office attendance with wellness insights.
+3. If the user requests to record, start, stop, check-in, check-out, or modify any tracking data, you MUST return a structured action object in your JSON response. Do NOT perform any database writes yourself, just supply the action request.
+4. Available Actions:
    - CREATE_EXPENSE: { amount: Number (required), category: 'Food' | 'Travel' | 'Shopping' | 'Bills' | 'Other' (required), note: String (optional), date: String (optional, format YYYY-MM-DD, defaults to today: ${todayStr}) }
    - UPDATE_STEPS: { steps: Number (required), date: String (optional, YYYY-MM-DD, defaults to today: ${todayStr}) }
    - CHECK_IN: { time: String (optional, format HH:MM, defaults to now), date: String (optional, YYYY-MM-DD, defaults to today: ${todayStr}) }
@@ -102,7 +161,7 @@ Your tasks:
    - UPDATE_WORK_SUMMARY: { summary: String (required), date: String (optional, YYYY-MM-DD, defaults to today: ${todayStr}) }
    - CREATE_HOLIDAY: { date: String (required, format YYYY-MM-DD), name: String (required), type: 'Public' | 'Personal' (optional) }
 
-4. Response Format:
+5. Response Format:
    You MUST return a JSON object conforming exactly to this schema:
    {
      "reply": "Your conversational response in markdown formatting. If you are triggerring an action, explicitly confirm what action you have prepared.",
@@ -245,7 +304,30 @@ Your tasks:
         aiResponse.action = { type: 'STOP_WORK', payload: {} };
         aiResponse.reply = `Rule Agent: Stopping active work session timer.`;
       }
-      // Parse summary query
+      // Parse weekly summary query, e.g. "last week summary", "klast week summary", "past week summary", "weekly summary"
+      else if (
+        lowerMsg.includes('last week') || 
+        lowerMsg.includes('past week') || 
+        lowerMsg.includes('previous week') || 
+        lowerMsg.includes('klast week') || 
+        (lowerMsg.includes('week') && (lowerMsg.includes('summary') || lowerMsg.includes('report') || lowerMsg.includes('how was') || lowerMsg.includes('stats') || lowerMsg.includes('review')))
+      ) {
+        const lastWeek = getLastWeekMetrics(todayStr, expenses, activities, attendance, workSessions, holidays);
+        const workBreakdownStr = Object.entries(lastWeek.work.breakdown)
+          .map(([cat, ms]) => `${cat}: ${formatDuration(ms)}`)
+          .join(', ');
+        const spentBreakdownStr = Object.entries(lastWeek.expenses.breakdown)
+          .map(([cat, amt]) => `${cat}: ₹${amt.toLocaleString()}`)
+          .join(', ');
+
+        aiResponse.reply = `Rule Agent: Here is your **Last Week Summary** (${lastWeek.startDate} to ${lastWeek.endDate}):\n\n` +
+          `• ⏱️ **Total Work Logged**: ${formatDuration(lastWeek.work.totalMs)}${workBreakdownStr ? ` (${workBreakdownStr})` : ''}\n` +
+          `• 👟 **Total Steps Walked**: ${lastWeek.steps.total.toLocaleString()} steps (~${lastWeek.steps.avgDaily.toLocaleString()} steps/day, ${lastWeek.steps.distanceKm.toFixed(1)} km)\n` +
+          `• 💰 **Total Money Spent**: ₹${lastWeek.expenses.total.toLocaleString()}${spentBreakdownStr ? ` (${spentBreakdownStr})` : ''}\n` +
+          `• 🏢 **Office Days Attended**: ${lastWeek.office.daysAttended} day${lastWeek.office.daysAttended !== 1 ? 's' : ''} (${(lastWeek.office.totalDurationMs / 3600000).toFixed(1)} hours)\n` +
+          (lastWeek.holidays.length > 0 ? `• 🌴 **Holidays/Events**: ${lastWeek.holidays.map(h => `${h.name} (${h.date})`).join(', ')}\n` : '') +
+          `\nKeep up the great tracking and productivity! 🚀`;
+      }
       else if (lowerMsg.includes('yesterday')) {
         const yesterdayDate = new Date();
         yesterdayDate.setDate(yesterdayDate.getDate() - 1);
@@ -469,33 +551,108 @@ Your tasks:
   }
 });
 
-// @desc    Get AI Daily summary and coaching insights
+// @desc    Get AI Daily or Weekly summary and coaching insights
 // @route   GET /api/agent/summary
 // @access  Private
 router.get('/summary', protect, async (req, res) => {
-  const { date, timezoneOffset } = req.query;
+  const { date, timezoneOffset, type } = req.query;
   const userId = req.user._id;
   const todayStr = date || new Date().toISOString().split('T')[0];
+  const isWeekly = type === 'weekly';
 
   try {
-    // Fetch today's data specifically
-    const [expenses, activity, attendance, workSessions] = await Promise.all([
-      Expense.find({ userId, date: todayStr }),
-      DailyActivity.findOne({ userId, date: todayStr }),
-      OfficeAttendance.findOne({ userId, date: todayStr }),
-      WorkSession.find({ userId, date: todayStr })
-    ]);
-
-    const workDurationMs = workSessions.reduce((acc, curr) => acc + (curr.duration || 0), 0);
-    const spendingAmt = expenses.reduce((acc, curr) => acc + curr.amount, 0);
-    const stepsCount = activity?.steps || 0;
-
-    const geminiKey = process.env.GEMINI_API_KEY;
     let summaryJson = null;
+    let lastWeek = null;
+    let workDurationMs = 0;
+    let spendingAmt = 0;
+    let stepsCount = 0;
 
-    if (geminiKey) {
-      try {
-        const prompt = `You are a personal AI coach. Analyze the user's tracking metrics for today (${todayStr}) and summarize their day.
+    if (isWeekly) {
+      const startDate = getStartDate30DaysAgo();
+      const [expenses, activities, attendance, workSessions, holidays] = await Promise.all([
+        Expense.find({ userId, date: { $gte: startDate } }).sort({ date: -1 }),
+        DailyActivity.find({ userId, date: { $gte: startDate } }).sort({ date: -1 }),
+        OfficeAttendance.find({ userId, date: { $gte: startDate } }).sort({ date: -1 }),
+        WorkSession.find({ userId, date: { $gte: startDate } }).sort({ date: -1 }),
+        Holiday.find({ userId }).sort({ date: -1 })
+      ]);
+
+      lastWeek = getLastWeekMetrics(todayStr, expenses, activities, attendance, workSessions, holidays);
+
+      const geminiKey = process.env.GEMINI_API_KEY;
+      if (geminiKey) {
+        try {
+          const prompt = `You are a personal AI coach. Analyze the user's tracking metrics for the past week (${lastWeek.startDate} to ${lastWeek.endDate}) and summarize their week.
+Metrics:
+- Total Work Duration: ${formatDuration(lastWeek.work.totalMs)} (Breakdown: ${JSON.stringify(Object.fromEntries(Object.entries(lastWeek.work.breakdown).map(([k, v]) => [k, formatDuration(v)])))})
+- Total Steps Walked: ${lastWeek.steps.total.toLocaleString()} steps (Daily average: ~${lastWeek.steps.avgDaily.toLocaleString()} steps/day, ${lastWeek.steps.distanceKm.toFixed(1)} km)
+- Money Spent: ₹${lastWeek.expenses.total.toLocaleString()} (Breakdown: ${JSON.stringify(lastWeek.expenses.breakdown)})
+- Office Attendance: ${lastWeek.office.daysAttended} day(s) (${(lastWeek.office.totalDurationMs / 3600000).toFixed(1)} hours)
+- Holidays: ${JSON.stringify(lastWeek.holidays)}
+
+Write a comprehensive, encouraging summary (max 3-4 sentences) of their week's activities and achievements. Then suggest 3 concise bullet points of actionable coaching insights or wellness tips.
+Return a JSON object conforming exactly to this schema:
+{
+  "summary": "Your encouraging summary text here.",
+  "insights": ["Insight 1", "Insight 2", "Insight 3"]
+}
+`;
+
+          const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent?key=${geminiKey}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              contents: [{ parts: [{ text: prompt }] }],
+              generationConfig: {
+                responseMimeType: 'application/json'
+              }
+            })
+          });
+
+          const geminiData = await response.json();
+          if (response.ok) {
+            let rawText = geminiData.candidates?.[0]?.content?.parts?.[0]?.text;
+            if (rawText) {
+              rawText = rawText.trim();
+              if (rawText.startsWith('```')) {
+                rawText = rawText.replace(/^```(?:json)?\n?/i, '').replace(/\n?```$/, '').trim();
+              }
+              summaryJson = JSON.parse(rawText);
+            }
+          }
+        } catch (geminiErr) {
+          console.error('Gemini weekly summary call error:', geminiErr);
+        }
+      }
+
+      if (!summaryJson) {
+        summaryJson = {
+          summary: `Over the past week (${lastWeek.startDate} to ${lastWeek.endDate}), you logged ${formatDuration(lastWeek.work.totalMs)} of work sessions, walked a total of ${lastWeek.steps.total.toLocaleString()} steps (~${lastWeek.steps.avgDaily.toLocaleString()} steps/day), and spent ₹${lastWeek.expenses.total.toLocaleString()}.`,
+          insights: [
+            lastWeek.steps.avgDaily < 7000 ? "Aim to boost daily walking habits to hit 8,000 steps consistently." : "Outstanding weekly step consistency! You maintained an active routine.",
+            lastWeek.expenses.total > 3500 ? `Weekly spending reached ₹${lastWeek.expenses.total.toLocaleString()}. Review your budget to identify non-essential expenses.` : "Great job keeping spending disciplined this week.",
+            `You logged ${formatDuration(lastWeek.work.totalMs)} of focused work. Keep setting clear milestones for each day.`
+          ]
+        };
+      }
+    } else {
+      // Daily summary
+      const [expenses, activity, attendance, workSessions] = await Promise.all([
+        Expense.find({ userId, date: todayStr }),
+        DailyActivity.findOne({ userId, date: todayStr }),
+        OfficeAttendance.findOne({ userId, date: todayStr }),
+        WorkSession.find({ userId, date: todayStr })
+      ]);
+
+      workDurationMs = workSessions.reduce((acc, curr) => acc + (curr.duration || 0), 0);
+      spendingAmt = expenses.reduce((acc, curr) => acc + curr.amount, 0);
+      stepsCount = activity?.steps || 0;
+
+      const geminiKey = process.env.GEMINI_API_KEY;
+
+      if (geminiKey) {
+        try {
+          const prompt = `You are a personal AI coach. Analyze the user's tracking metrics for today (${todayStr}) and summarize their day.
 Metrics:
 - Steps: ${stepsCount} (distance: ${activity?.walkingDistance || 0} km)
 - Office check-in: ${getLocalTimeString(attendance?.arrivalTime, timezoneOffset)}
@@ -512,43 +669,43 @@ Return a JSON object conforming exactly to this schema:
 }
 `;
 
-        const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent?key=${geminiKey}`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            contents: [{ parts: [{ text: prompt }] }],
-            generationConfig: {
-              responseMimeType: 'application/json'
-            }
-          })
-        });
+          const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent?key=${geminiKey}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              contents: [{ parts: [{ text: prompt }] }],
+              generationConfig: {
+                responseMimeType: 'application/json'
+              }
+            })
+          });
 
-        const geminiData = await response.json();
-        if (response.ok) {
-          let rawText = geminiData.candidates?.[0]?.content?.parts?.[0]?.text;
-          if (rawText) {
-            rawText = rawText.trim();
-            if (rawText.startsWith('```')) {
-              rawText = rawText.replace(/^```(?:json)?\n?/i, '').replace(/\n?```$/, '').trim();
+          const geminiData = await response.json();
+          if (response.ok) {
+            let rawText = geminiData.candidates?.[0]?.content?.parts?.[0]?.text;
+            if (rawText) {
+              rawText = rawText.trim();
+              if (rawText.startsWith('```')) {
+                rawText = rawText.replace(/^```(?:json)?\n?/i, '').replace(/\n?```$/, '').trim();
+              }
+              summaryJson = JSON.parse(rawText);
             }
-            summaryJson = JSON.parse(rawText);
           }
+        } catch (geminiErr) {
+          console.error('Gemini summary call error:', geminiErr);
         }
-      } catch (geminiErr) {
-        console.error('Gemini summary call error:', geminiErr);
       }
-    }
 
-    if (!summaryJson) {
-      // Fallback response
-      const workHoursText = formatDuration(workDurationMs);
-      summaryJson = {
-        summary: `Today, you logged ${workHoursText} of work sessions, walked ${stepsCount.toLocaleString()} steps, and spent ₹${spendingAmt}. Connect the Gemini API in the environment settings to unlock deep, personalized AI coaching summaries!`,
-        insights: [
-          stepsCount < 6000 ? "Try to take a quick walk in the evening to hit 8,000 steps." : "Excellent job hitting your steps today! Keep it up.",
-          spendingAmt > 500 ? "You spent ₹" + spendingAmt + " today. Review your budget to ensure you are on track." : "Good job keeping expenses low today."
-        ]
-      };
+      if (!summaryJson) {
+        const workHoursText = formatDuration(workDurationMs);
+        summaryJson = {
+          summary: `Today, you logged ${workHoursText} of work sessions, walked ${stepsCount.toLocaleString()} steps, and spent ₹${spendingAmt}. Connect the Gemini API in the environment settings to unlock deep, personalized AI coaching summaries!`,
+          insights: [
+            stepsCount < 6000 ? "Try to take a quick walk in the evening to hit 8,000 steps." : "Excellent job hitting your steps today! Keep it up.",
+            spendingAmt > 500 ? "You spent ₹" + spendingAmt + " today. Review your budget to ensure you are on track." : "Good job keeping expenses low today."
+          ]
+        };
+      }
     }
 
     res.json(summaryJson);

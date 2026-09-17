@@ -40,6 +40,7 @@ const Dashboard = ({ user, triggerReloadUser }) => {
   // AI summary states
   const [aiSummary, setAiSummary] = useState(null);
   const [loadingAiSummary, setLoadingAiSummary] = useState(false);
+  const [aiSummaryType, setAiSummaryType] = useState('daily'); // 'daily' | 'weekly'
 
   useEffect(() => {
     if (attendance) {
@@ -168,10 +169,11 @@ const Dashboard = ({ user, triggerReloadUser }) => {
   const token = localStorage.getItem('lifetrack_token');
   const todayStr = new Date().toISOString().split('T')[0];
 
-  const fetchAiSummary = async () => {
+  const fetchAiSummary = async (typeToFetch) => {
+    const selectedType = typeToFetch || aiSummaryType;
     try {
       setLoadingAiSummary(true);
-      const res = await fetch(`/api/agent/summary?date=${todayStr}&timezoneOffset=${new Date().getTimezoneOffset()}`, {
+      const res = await fetch(`/api/agent/summary?date=${todayStr}&timezoneOffset=${new Date().getTimezoneOffset()}&type=${selectedType}`, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
       if (res.ok) {
@@ -722,27 +724,66 @@ const Dashboard = ({ user, triggerReloadUser }) => {
             
             {/* AI Companion Widget Card */}
             <div className="glass-card-raised" style={{ borderLeft: '3px solid #0a84ff', display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.5rem' }}>
                 <h3 style={{ fontSize: '1.05rem', fontWeight: 700, margin: 0, display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
                   <Sparkles size={16} style={{ color: '#0a84ff' }} />
-                  AI Daily Insights
+                  {aiSummaryType === 'weekly' ? 'AI Weekly Review' : 'AI Daily Insights'}
                 </h3>
-                <button 
-                  onClick={fetchAiSummary} 
-                  disabled={loadingAiSummary}
-                  style={{
-                    background: 'none', border: 'none', color: '#0a84ff', 
-                    fontSize: '0.75rem', fontWeight: 600, cursor: 'pointer',
-                    display: 'flex', alignItems: 'center', gap: '0.2rem'
-                  }}
-                >
-                  <RefreshCw size={12} className={loadingAiSummary ? 'anim-pulse' : ''} />
-                  Refresh
-                </button>
+                
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                  {/* Toggle Daily / Weekly */}
+                  <div style={{ display: 'flex', background: 'rgba(255,255,255,0.06)', borderRadius: '6px', padding: '2px' }}>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setAiSummaryType('daily');
+                        fetchAiSummary('daily');
+                      }}
+                      style={{
+                        background: aiSummaryType === 'daily' ? '#0a84ff' : 'transparent',
+                        color: aiSummaryType === 'daily' ? '#fff' : '#8e8e93',
+                        border: 'none', borderRadius: '4px', padding: '2px 8px', fontSize: '0.7rem', fontWeight: 600, cursor: 'pointer',
+                        transition: 'all 0.2s ease'
+                      }}
+                    >
+                      Today
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setAiSummaryType('weekly');
+                        fetchAiSummary('weekly');
+                      }}
+                      style={{
+                        background: aiSummaryType === 'weekly' ? '#0a84ff' : 'transparent',
+                        color: aiSummaryType === 'weekly' ? '#fff' : '#8e8e93',
+                        border: 'none', borderRadius: '4px', padding: '2px 8px', fontSize: '0.7rem', fontWeight: 600, cursor: 'pointer',
+                        transition: 'all 0.2s ease'
+                      }}
+                    >
+                      Last Week
+                    </button>
+                  </div>
+
+                  <button 
+                    onClick={() => fetchAiSummary(aiSummaryType)} 
+                    disabled={loadingAiSummary}
+                    style={{
+                      background: 'none', border: 'none', color: '#0a84ff', 
+                      fontSize: '0.75rem', fontWeight: 600, cursor: 'pointer',
+                      display: 'flex', alignItems: 'center', gap: '0.2rem'
+                    }}
+                  >
+                    <RefreshCw size={12} className={loadingAiSummary ? 'anim-pulse' : ''} />
+                    Refresh
+                  </button>
+                </div>
               </div>
 
               {loadingAiSummary ? (
-                <p style={{ color: '#8e8e93', fontSize: '0.8rem', fontStyle: 'italic', margin: 0 }}>Analyzing daily metrics...</p>
+                <p style={{ color: '#8e8e93', fontSize: '0.8rem', fontStyle: 'italic', margin: 0 }}>
+                  Analyzing {aiSummaryType === 'weekly' ? 'last week\'s' : 'daily'} metrics...
+                </p>
               ) : aiSummary ? (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '0.65rem' }}>
                   <p style={{ fontSize: '0.85rem', color: '#ffffff', margin: 0, lineHeight: '1.4' }}>
@@ -761,14 +802,16 @@ const Dashboard = ({ user, triggerReloadUser }) => {
               ) : (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
                   <p style={{ fontSize: '0.8rem', color: '#8e8e93', margin: 0 }}>
-                    Let the AI Coach review your day's expenses, steps, and work sessions.
+                    {aiSummaryType === 'weekly' 
+                      ? 'Let the AI Coach analyze your last 7 days of productivity, fitness steps, and spending.'
+                      : 'Let the AI Coach review your day\'s expenses, steps, and work sessions.'}
                   </p>
                   <button 
-                    onClick={fetchAiSummary} 
+                    onClick={() => fetchAiSummary(aiSummaryType)} 
                     className="btn btn-secondary" 
                     style={{ alignSelf: 'flex-start', padding: '0.35rem 0.75rem', fontSize: '0.75rem', borderRadius: '8px' }}
                   >
-                    Generate Insights
+                    Generate {aiSummaryType === 'weekly' ? 'Weekly Review' : 'Daily Insights'}
                   </button>
                 </div>
               )}

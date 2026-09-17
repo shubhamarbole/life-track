@@ -12,7 +12,7 @@ const AiAssistant = () => {
       {
         id: 'welcome',
         sender: 'agent',
-        text: "Hello! I am your **DayTrack AI Assistant**. I can help you analyze your habits, answer questions about your history (spending, steps, office hours), and log details directly.\n\nTry asking: \n- *'How much did I spend this week?'*\n- *'Log ₹150 for Food for Lunch'* \n- *'Start a Coding session'*",
+        text: "Hello! I am your **DayTrack AI Assistant**. I can help you analyze your habits, answer questions about your history (spending, steps, office hours), and log details directly.\n\nTry asking: \n- *'Give me my last week summary'*\n- *'How much did I spend this week?'*\n- *'Log ₹150 for Food for Lunch'* \n- *'Start a Coding session'*",
         timestamp: new Date()
       }
     ];
